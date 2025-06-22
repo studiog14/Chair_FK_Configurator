@@ -4,32 +4,15 @@
   <meta charset="UTF-8" />
   <title>3D Configurator</title>
   <style>
-    body {
-      margin: 0;
-      overflow: hidden;
-      background: white; /* białe tło */
-      color: black;
-      font-family: sans-serif;
-    }
-    canvas {
-      display: block;
-      position: relative;
-      z-index: 1; /* mniej niż UI i loading */
-      background: white;
-    }
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
     .ui {
-      position: absolute;
-      top: 10px;
-      left: 10px;
-      background: rgba(255, 255, 255, 0.9);
-      padding: 10px;
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(255, 255, 255, 0.9); padding: 10px;
       border-radius: 8px;
       z-index: 10;
-      color: black;
     }
-    button {
-      margin: 5px;
-    }
+    button { margin: 5px; }
     #loadingOverlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -58,12 +41,10 @@
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
 
     const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 1, 5);
 
-    const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false}); // alpha: false dla białego tła
-    renderer.setClearColor(0xffffff, 1); // białe tło
+    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
@@ -74,17 +55,17 @@
     directionalLight.position.set(5, 10, 7);
     scene.add(directionalLight);
 
-    // Zielona siatka podłogi dla lepszego widoku
     const gridHelper = new THREE.GridHelper(10, 10, 0x00ff00, 0x00ff00);
     scene.add(gridHelper);
 
     const loader = new GLTFLoader();
-    let currentModel;
+    loader.setCrossOrigin('anonymous');
 
+    let currentModel;
     const loadingOverlay = document.getElementById('loadingOverlay');
 
     function loadModel(path) {
-      console.log('Loading model:', path);
+      console.log('🔄 Ładowanie modelu:', path);
       loadingOverlay.style.display = 'flex';
 
       if (currentModel) {
@@ -100,26 +81,39 @@
           }
         });
       }
-      loader.load(path, gltf => {
-        currentModel = gltf.scene;
-        currentModel.position.set(0, 0, 0);
-        currentModel.scale.set(1, 1, 1);
-        scene.add(currentModel);
 
-        // Automatyczne ustawienie kamery wokół modelu
-        const box = new THREE.Box3().setFromObject(currentModel);
-        const size = box.getSize(new THREE.Vector3()).length();
-        const center = box.getCenter(new THREE.Vector3());
+      loader.load(
+        path,
+        gltf => {
+          console.log('✅ Model załadowany:', gltf);
 
-        camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
-        camera.lookAt(center);
+          currentModel = gltf.scene;
+          currentModel.position.set(0, 0, 0);
+          currentModel.scale.set(1, 1, 1);
+          scene.add(currentModel);
 
-        console.log('Model loaded:', path);
-        loadingOverlay.style.display = 'none';
-      }, undefined, error => {
-        console.error('Error loading model:', error);
-        loadingOverlay.textContent = 'Error loading model :(';
-      });
+          const box = new THREE.Box3().setFromObject(currentModel);
+          const size = box.getSize(new THREE.Vector3()).length();
+          const center = box.getCenter(new THREE.Vector3());
+
+          camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
+          camera.lookAt(center);
+
+          loadingOverlay.style.display = 'none';
+        },
+        xhr => {
+          if (xhr.lengthComputable) {
+            const percent = (xhr.loaded / xhr.total * 100).toFixed(1);
+            console.log(`📦 Załadowano: ${percent}%`);
+          } else {
+            console.log('📦 Załadowano dane (długość nieznana)...');
+          }
+        },
+        error => {
+          console.error('❌ Błąd ładowania modelu:', error);
+          loadingOverlay.textContent = '❌ Error loading model :(';
+        }
+      );
     }
 
     function animate() {
@@ -129,14 +123,18 @@
       }
       renderer.render(scene, camera);
     }
+
     animate();
 
     window.loadModel = loadModel;
 
-    // Domyślnie ładujemy model Fargo
     loadModel('models/Fargo.glb');
 
     window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSi
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
