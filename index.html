@@ -13,9 +13,24 @@
       z-index: 10;
     }
     button { margin: 5px; }
+    #loadingOverlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: white;
+      color: black;
+      font-size: 24px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      user-select: none;
+      font-family: sans-serif;
+    }
   </style>
 </head>
 <body>
+  <div id="loadingOverlay">Loading 3D model...</div>
+
   <div class="ui">
     <button onclick="loadModel('models/Fargo.glb')">Fargo</button>
     <button onclick="loadModel('models/Marco.glb')">Marco</button>
@@ -34,7 +49,6 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    // Światła: ambient + directional
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -45,7 +59,12 @@
     const loader = new GLTFLoader();
     let currentModel;
 
+    const loadingOverlay = document.getElementById('loadingOverlay');
+
     function loadModel(path) {
+      console.log('Loading model:', path);
+      loadingOverlay.style.display = 'flex';
+
       if (currentModel) {
         scene.remove(currentModel);
         currentModel.traverse(child => {
@@ -59,43 +78,4 @@
           }
         });
       }
-      loader.load(path, gltf => {
-        currentModel = gltf.scene;
-        currentModel.position.set(0, 0, 0);
-        currentModel.scale.set(1, 1, 1);
-        scene.add(currentModel);
-
-        // Dopasuj kamerę do modelu
-        const box = new THREE.Box3().setFromObject(currentModel);
-        const size = box.getSize(new THREE.Vector3()).length();
-        const center = box.getCenter(new THREE.Vector3());
-
-        // Przesuń kamerę tak, żeby model był w polu widzenia
-        camera.position.set(center.x, center.y, size * 1.5);
-        camera.lookAt(center);
-
-        console.log('Model loaded:', path);
-      }, undefined, error => {
-        console.error('Error loading model:', error);
-      });
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      renderer.render(scene, camera);
-    }
-    animate();
-
-    window.loadModel = loadModel;
-
-    // Załaduj domyślnie model Fargo
-    loadModel('models/Fargo.glb');
-
-    window.addEventListener('resize', () => {
-      camera.aspect = window.innerWidth/window.innerHeight;
-      camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  </script>
-</body>
-</html>
+      loader.load(path
