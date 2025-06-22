@@ -4,15 +4,32 @@
   <meta charset="UTF-8" />
   <title>3D Configurator</title>
   <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
+    body {
+      margin: 0;
+      overflow: hidden;
+      background: white; /* białe tło */
+      color: black;
+      font-family: sans-serif;
+    }
+    canvas {
+      display: block;
+      position: relative;
+      z-index: 1; /* mniej niż UI i loading */
+      background: white;
+    }
     .ui {
-      position: absolute; top: 10px; left: 10px;
-      background: rgba(255, 255, 255, 0.9); padding: 10px;
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      background: rgba(255, 255, 255, 0.9);
+      padding: 10px;
       border-radius: 8px;
       z-index: 10;
+      color: black;
     }
-    button { margin: 5px; }
+    button {
+      margin: 5px;
+    }
     #loadingOverlay {
       position: fixed;
       top: 0; left: 0; right: 0; bottom: 0;
@@ -45,7 +62,8 @@
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
     camera.position.set(0, 1, 5);
 
-    const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+    const renderer = new THREE.WebGLRenderer({antialias: true, alpha: false}); // alpha: false dla białego tła
+    renderer.setClearColor(0xffffff, 1); // białe tło
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
@@ -121,8 +139,4 @@
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
-      renderer.setSize(window.innerWidth, window.innerHeight);
-    });
-  </script>
-</body>
-</html>
+      renderer.setSi
