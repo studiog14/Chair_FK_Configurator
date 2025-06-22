@@ -1,191 +1,235 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
-    <meta charset="utf-8" />
-    <title>3D Chair Configurator</title>
+    <meta charset="UTF-8" />
+    <title>3D Configurator</title>
     <style>
       body {
         margin: 0;
         overflow: hidden;
       }
+      canvas {
+        display: block;
+      }
+      .ui {
+        position: absolute;
+        top: 10px;
+        left: 10px;
+        background: rgba(255, 255, 255, 0.9);
+        padding: 10px;
+        border-radius: 8px;
+        z-index: 10;
+      }
+      button {
+        margin: 5px;
+      }
       #loadingOverlay {
         position: fixed;
         top: 0;
         left: 0;
-        width: 100vw;
-        height: 100vh;
-        background: rgba(0, 0, 0, 0.7);
-        color: white;
-        font-size: 1.5em;
+        right: 0;
+        bottom: 0;
+        background: white;
+        color: black;
+        font-size: 24px;
         display: flex;
         justify-content: center;
         align-items: center;
-        z-index: 10;
-      }
-      .ui {
-        position: fixed;
-        top: 20px;
-        left: 20px;
-        z-index: 20;
-      }
-      .ui button {
-        margin-right: 10px;
-        font-size: 1em;
-        padding: 0.5em 1em;
+        z-index: 1000;
+        user-select: none;
+        font-family: sans-serif;
       }
     </style>
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+        }
+      }
+    </script>
   </head>
 
   <body>
     <div id="loadingOverlay">Loading 3D model...</div>
+
     <div class="ui">
-      <button onclick="loadModel('models/Fargo.glb')">Fargo</button>
-      <button onclick="loadModel('models/Marco.glb')">Marco</button>
+      <button id="btnFargo">Fargo</button>
+      <button id="btnMarco">Marco</button>
     </div>
 
     <script type="module">
-      import * as THREE from 'three';
-      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-      import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
+  import * as THREE from "three";
+  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-      const scene = new THREE.Scene();
+  const scene = new THREE.Scene();
 
-      const camera = new THREE.PerspectiveCamera(
-        45,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        100
-      );
-      camera.position.set(0, 1, 5);
+  const camera = new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    100
+  );
+  camera.position.set(0, 1, 5);
 
-      const renderer = new THREE.WebGLRenderer({
-        antialias: true,
-        alpha: true,
-      });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1;
-      renderer.shadowMap.enabled = true;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      document.body.appendChild(renderer.domElement);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      scene.add(ambientLight);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(5, 10, 7);
-      directionalLight.castShadow = true;
-      directionalLight.shadow.mapSize.set(1024, 1024);
-      scene.add(directionalLight);
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+  directionalLight.position.set(5, 10, 7);
+  scene.add(directionalLight);
 
-      const loader = new GLTFLoader();
-      let currentModel;
-      const loadingOverlay = document.getElementById('loadingOverlay');
+  const loader = new GLTFLoader();
+  let currentModel;
 
-      const pmremGenerator = new THREE.PMREMGenerator(renderer);
-      pmremGenerator.compileEquirectangularShader();
+  const loadingOverlay = document.getElementById("loadingOverlay");
 
-      function startLoadingModel() {
-        loadModel('models/Fargo.glb');
-      }
+  // Kontrola obracania i interakcji
+  const controls = {
+    userIsInteracting: false,
+  };
 
-      // Ładujemy HDR z obsługą błędów
-      new RGBELoader()
-        .setPath('hdr/')
-        .load(
-          'neon_photostudio_4k.hdr',
-          (texture) => {
-            const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-            scene.environment = envMap;
-            scene.background = null; // lub: envMap dla tła
-            texture.dispose();
-            pmremGenerator.dispose();
-            console.log('✅ HDR załadowany');
-            startLoadingModel();
-          },
-          undefined,
-          (error) => {
-            console.error('❌ Błąd ładowania HDR:', error);
-            alert('Nie udało się załadować HDR, ładuję model bez HDR');
-            startLoadingModel();
+  // Obsługa myszy dla obracania modelu
+  let previousMouseX = 0;
+  let previousMouseY = 0;
+
+  function onMouseDown(event) {
+    controls.userIsInteracting = true;
+    previousMouseX = event.clientX;
+    previousMouseY = event.clientY;
+  }
+
+  function onMouseMove(event) {
+    if (controls.userIsInteracting && currentModel) {
+      const deltaX = event.clientX - previousMouseX;
+      const deltaY = event.clientY - previousMouseY;
+
+      currentModel.rotation.y += deltaX * 0.005;
+      currentModel.rotation.x += deltaY * 0.003;
+
+      // Ograniczenie kąta obracania góra-dół (X) żeby nie przekręcać zbyt mocno
+      currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
+
+      previousMouseX = event.clientX;
+      previousMouseY = event.clientY;
+    }
+  }
+
+  function onMouseUp() {
+    controls.userIsInteracting = false;
+  }
+
+  window.addEventListener("mousedown", onMouseDown);
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("mouseup", onMouseUp);
+
+  function clamp(value, min, max) {
+    return Math.min(Math.max(value, min), max);
+  }
+
+  // Zoom - płynny i wolniejszy
+  let targetCameraZ = camera.position.z;
+  const minCameraZ = 0.6; // minimalne przybliżenie
+  const maxCameraZ = 1.8; // maksymalne oddalenie
+  const zoomSpeed = 0.001; // siła zoomu
+  const zoomLerpFactor = 0.1; // płynność zoomu
+
+  window.addEventListener("wheel", (event) => {
+    if (!currentModel) return;
+
+    targetCameraZ += event.deltaY * zoomSpeed; // event.deltaY dodatnie = scroll w dół
+    targetCameraZ = clamp(targetCameraZ, minCameraZ, maxCameraZ);
+  });
+
+  function loadModel(path) {
+    console.log("🔄 Ładowanie modelu:", path);
+    loadingOverlay.style.display = "flex";
+
+    if (currentModel) {
+      scene.remove(currentModel);
+      currentModel.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((mat) => mat.dispose());
+          } else {
+            child.material.dispose();
           }
-        );
-
-      function loadModel(path) {
-        console.log('🔄 Ładowanie modelu:', path);
-        loadingOverlay.style.display = 'flex';
-
-        if (currentModel) {
-          scene.remove(currentModel);
-          currentModel.traverse((child) => {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach((mat) => mat.dispose());
-              } else {
-                child.material.dispose();
-              }
-            }
-          });
         }
-
-        loader.load(
-          path,
-          (gltf) => {
-            console.log('✅ Model załadowany:', gltf);
-            currentModel = gltf.scene;
-
-            currentModel.traverse((child) => {
-              if (child.isMesh) {
-                child.castShadow = true;
-                child.receiveShadow = true;
-                if (child.material) child.material.needsUpdate = true;
-              }
-            });
-
-            currentModel.position.set(0, 0, 0);
-            currentModel.scale.set(1, 1, 1);
-            scene.add(currentModel);
-
-            const box = new THREE.Box3().setFromObject(currentModel);
-            const size = box.getSize(new THREE.Vector3()).length();
-            const center = box.getCenter(new THREE.Vector3());
-
-            camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
-            camera.lookAt(center);
-
-            loadingOverlay.style.display = 'none';
-          },
-          (xhr) => {
-            if (xhr.lengthComputable) {
-              const percent = ((xhr.loaded / xhr.total) * 100).toFixed(1);
-              console.log(`📦 Załadowano: ${percent}%`);
-            }
-          },
-          (error) => {
-            console.error('❌ Błąd ładowania modelu:', error);
-            loadingOverlay.textContent = '❌ Error loading model :(';
-          }
-        );
-      }
-
-      function animate() {
-        requestAnimationFrame(animate);
-        if (currentModel) {
-          currentModel.rotation.y += 0.001;
-        }
-        renderer.render(scene, camera);
-      }
-      animate();
-
-      window.loadModel = loadModel;
-
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
       });
-    </script>
+    }
+
+    loader.load(
+      path,
+      (gltf) => {
+        console.log("✅ Model załadowany:", gltf);
+        currentModel = gltf.scene;
+        currentModel.position.set(0, 0, 0);
+        currentModel.scale.set(1, 1, 1);
+        scene.add(currentModel);
+
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+
+        camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
+        targetCameraZ = camera.position.z; // reset zoomu po załadowaniu modelu
+        camera.lookAt(center);
+
+        loadingOverlay.style.display = "none";
+      },
+      (xhr) => {
+        if (xhr.lengthComputable) {
+          const percent = ((xhr.loaded / xhr.total) * 100).toFixed(1);
+          console.log(`📦 Załadowano: ${percent}%`);
+        }
+      },
+      (error) => {
+        console.error("❌ Błąd ładowania modelu:", error);
+        loadingOverlay.textContent = "❌ Error loading model :(";
+      }
+    );
+  }
+
+  function animate() {
+    requestAnimationFrame(animate);
+
+    // Płynne przesuwanie kamery w osi Z (zoom)
+    camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
+
+    // Wolny automatyczny obrót modelu tylko jeśli nie interakcja użytkownika
+    if (currentModel && !controls.userIsInteracting) {
+      currentModel.rotation.y += 0.0005;
+    }
+
+    renderer.render(scene, camera);
+  }
+  animate();
+
+  // Globalna funkcja do ładowania modeli z przycisków
+  window.loadModel = loadModel;
+
+  // Podpięcie event listenerów do przycisków (jeśli masz takie w HTML)
+  document
+    .getElementById("btnFargo")
+    ?.addEventListener("click", () => loadModel("models/Fargo.glb"));
+  document
+    .getElementById("btnMarco")
+    ?.addEventListener("click", () => loadModel("models/Marco.glb"));
+
+  // Domyślnie ładuj model Fargo
+  loadModel("models/Fargo.glb");
+
+  window.addEventListener("resize", () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
+
   </body>
 </html>
