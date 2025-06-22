@@ -36,11 +36,13 @@
     <button onclick="loadModel('models/Marco.glb')">Marco</button>
   </div>
 
-  <script type="module">
-    import * as THREE from 'https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js';
-    import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
+  <!-- Three.js i GLTFLoader -->
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
 
+  <script>
     const scene = new THREE.Scene();
+
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 1, 5);
 
@@ -58,10 +60,9 @@
     const gridHelper = new THREE.GridHelper(10, 10, 0x00ff00, 0x00ff00);
     scene.add(gridHelper);
 
-    const loader = new GLTFLoader();
-    loader.setCrossOrigin('anonymous');
-
+    const loader = new THREE.GLTFLoader();
     let currentModel;
+
     const loadingOverlay = document.getElementById('loadingOverlay');
 
     function loadModel(path) {
@@ -86,7 +87,6 @@
         path,
         gltf => {
           console.log('✅ Model załadowany:', gltf);
-
           currentModel = gltf.scene;
           currentModel.position.set(0, 0, 0);
           currentModel.scale.set(1, 1, 1);
@@ -106,7 +106,7 @@
             const percent = (xhr.loaded / xhr.total * 100).toFixed(1);
             console.log(`📦 Załadowano: ${percent}%`);
           } else {
-            console.log('📦 Załadowano dane (długość nieznana)...');
+            console.log('📦 Ładowanie modelu...');
           }
         },
         error => {
@@ -125,9 +125,7 @@
     }
 
     animate();
-
     window.loadModel = loadModel;
-
     loadModel('models/Fargo.glb');
 
     window.addEventListener('resize', () => {
