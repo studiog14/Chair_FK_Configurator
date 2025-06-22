@@ -56,6 +56,10 @@
     directionalLight.position.set(5, 10, 7);
     scene.add(directionalLight);
 
+    // Zielona siatka podłogi dla lepszego widoku
+    const gridHelper = new THREE.GridHelper(10, 10, 0x00ff00, 0x00ff00);
+    scene.add(gridHelper);
+
     const loader = new GLTFLoader();
     let currentModel;
 
@@ -78,4 +82,47 @@
           }
         });
       }
-      loader.load(path
+      loader.load(path, gltf => {
+        currentModel = gltf.scene;
+        currentModel.position.set(0, 0, 0);
+        currentModel.scale.set(1, 1, 1);
+        scene.add(currentModel);
+
+        // Automatyczne ustawienie kamery wokół modelu
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+
+        camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
+        camera.lookAt(center);
+
+        console.log('Model loaded:', path);
+        loadingOverlay.style.display = 'none';
+      }, undefined, error => {
+        console.error('Error loading model:', error);
+        loadingOverlay.textContent = 'Error loading model :(';
+      });
+    }
+
+    function animate() {
+      requestAnimationFrame(animate);
+      if (currentModel) {
+        currentModel.rotation.y += 0.005;
+      }
+      renderer.render(scene, camera);
+    }
+    animate();
+
+    window.loadModel = loadModel;
+
+    // Domyślnie ładujemy model Fargo
+    loadModel('models/Fargo.glb');
+
+    window.addEventListener('resize', () => {
+      camera.aspect = window.innerWidth/window.innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(window.innerWidth, window.innerHeight);
+    });
+  </script>
+</body>
+</html>
