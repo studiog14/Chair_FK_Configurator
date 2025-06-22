@@ -2,34 +2,49 @@
 <html lang="en">
   <head>
     <meta charset="utf-8" />
-    <title>Three.js Configurator</title>
+    <title>3D Chair Configurator</title>
     <style>
-      body { margin: 0; overflow: hidden; }
-      canvas { display: block; }
-      .ui {
-        position: absolute;
-        top: 10px; left: 10px;
-        background: rgba(255,255,255,0.9);
-        padding: 10px; border-radius: 8px;
-        z-index: 10;
+      body {
+        margin: 0;
+        overflow: hidden;
+        font-family: sans-serif;
       }
-      button { margin: 5px; }
+
       #loadingOverlay {
         position: fixed;
-        top: 0; left: 0; right: 0; bottom: 0;
-        background: white; color: black;
-        font-size: 24px; display: flex;
-        justify-content: center; align-items: center;
-        z-index: 1000; font-family: sans-serif;
+        top: 0;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background: rgba(255, 255, 255, 0.9);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 100;
+        font-size: 1.5em;
+      }
+
+      .ui {
+        position: fixed;
+        top: 10px;
+        left: 10px;
+        z-index: 101;
+      }
+
+      .ui button {
+        margin-right: 5px;
+        padding: 8px 12px;
+        font-size: 14px;
+        cursor: pointer;
       }
     </style>
 
-    <!-- importmap dla three i dodatków -->
+    <!-- Import map -->
     <script type="importmap">
       {
         "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
         }
       }
     </script>
@@ -37,15 +52,16 @@
 
   <body>
     <div id="loadingOverlay">Loading 3D model...</div>
+
     <div class="ui">
       <button onclick="loadModel('models/Fargo.glb')">Fargo</button>
       <button onclick="loadModel('models/Marco.glb')">Marco</button>
     </div>
 
-    <!-- właściwy kod three.js jako moduł -->
     <script type="module">
       import * as THREE from 'three';
       import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
       const scene = new THREE.Scene();
 
@@ -63,8 +79,22 @@
       directionalLight.position.set(5, 10, 7);
       scene.add(directionalLight);
 
-      const gridHelper = new THREE.GridHelper(10, 10, 0x00ff00, 0x00ff00);
-      scene.add(gridHelper);
+      const controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.05;
+      controls.target.set(0, 1, 0);
+      controls.update();
+      controls.userIsInteracting = false;
+
+      renderer.domElement.addEventListener('pointerdown', () => {
+        controls.userIsInteracting = true;
+      });
+
+      renderer.domElement.addEventListener('pointerup', () => {
+        setTimeout(() => {
+          controls.userIsInteracting = false;
+        }, 3000);
+      });
 
       const loader = new GLTFLoader();
       let currentModel;
@@ -105,6 +135,9 @@
             camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
             camera.lookAt(center);
 
+            controls.target.copy(center);
+            controls.update();
+
             loadingOverlay.style.display = 'none';
           },
           xhr => {
@@ -122,7 +155,12 @@
 
       function animate() {
         requestAnimationFrame(animate);
-        if (currentModel) currentModel.rotation.y += 0.005;
+
+        if (currentModel && !controls.userIsInteracting) {
+          currentModel.rotation.y += 0.001;
+        }
+
+        controls.update();
         renderer.render(scene, camera);
       }
 
