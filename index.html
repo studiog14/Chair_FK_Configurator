@@ -32,8 +32,8 @@
   <div id="loadingOverlay">Loading 3D model...</div>
 
   <div class="ui">
-    <button onclick="window.loadModel('models/Fargo.glb')">Fargo</button>
-    <button onclick="window.loadModel('models/Marco.glb')">Marco</button>
+    <button id="fargoBtn">Fargo</button>
+    <button id="marcoBtn">Marco</button>
   </div>
 
   <script type="module">
@@ -62,9 +62,7 @@
     const loadingOverlay = document.getElementById('loadingOverlay');
 
     function loadModel(path) {
-      console.log('🔄 Ładowanie modelu:', path);
       loadingOverlay.style.display = 'flex';
-
       if (currentModel) {
         scene.remove(currentModel);
         currentModel.traverse(child => {
@@ -82,7 +80,6 @@
       loader.load(
         path,
         gltf => {
-          console.log('✅ Model załadowany:', gltf);
           currentModel = gltf.scene;
           currentModel.position.set(0, 0, 0);
           currentModel.scale.set(1, 1, 1);
@@ -100,14 +97,12 @@
         xhr => {
           if (xhr.lengthComputable) {
             const percent = (xhr.loaded / xhr.total * 100).toFixed(1);
-            console.log(`📦 Załadowano: ${percent}%`);
-          } else {
-            console.log('📦 Ładowanie modelu...');
+            console.log(`Loading: ${percent}%`);
           }
         },
         error => {
-          console.error('❌ Błąd ładowania modelu:', error);
-          loadingOverlay.textContent = '❌ Error loading model :(';
+          console.error('Error loading model:', error);
+          loadingOverlay.textContent = '❌ Error loading model';
         }
       );
     }
@@ -119,10 +114,18 @@
     }
 
     animate();
-    window.loadModel = loadModel;
-    loadModel('models/Fargo.glb');
 
-    window.addEventListener('resize', () => {
+    // Make loadModel globally available
+    window.loadModel = loadModel;
+
+    // Add event listeners for buttons
+    document.getElementById("fargoBtn").addEventListener("click", () => loadModel("models/Fargo.glb"));
+    document.getElementById("marcoBtn").addEventListener("click", () => loadModel("models/Marco.glb"));
+
+    // Load the default model on start
+    loadModel("models/Fargo.glb");
+
+    window.addEventListener("resize", () => {
       camera.aspect = window.innerWidth / window.innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(window.innerWidth, window.innerHeight);
