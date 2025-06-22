@@ -36,13 +36,11 @@
     <button onclick="loadModel('models/Marco.glb')">Marco</button>
   </div>
 
-  <!-- Three.js i GLTFLoader -->
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/three@0.152.2/examples/js/loaders/GLTFLoader.js"></script>
+  <script type="module">
+    import * as THREE from "https://unpkg.com/three@0.160.0/build/three.module.js";
+    import { GLTFLoader } from "https://unpkg.com/three@0.160.0/examples/jsm/loaders/GLTFLoader.js";
 
-  <script>
     const scene = new THREE.Scene();
-
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
     camera.position.set(0, 1, 5);
 
@@ -60,9 +58,8 @@
     const gridHelper = new THREE.GridHelper(10, 10, 0x00ff00, 0x00ff00);
     scene.add(gridHelper);
 
-    const loader = new THREE.GLTFLoader();
+    const loader = new GLTFLoader();
     let currentModel;
-
     const loadingOverlay = document.getElementById('loadingOverlay');
 
     function loadModel(path) {
@@ -118,9 +115,7 @@
 
     function animate() {
       requestAnimationFrame(animate);
-      if (currentModel) {
-        currentModel.rotation.y += 0.005;
-      }
+      if (currentModel) currentModel.rotation.y += 0.005;
       renderer.render(scene, camera);
     }
 
