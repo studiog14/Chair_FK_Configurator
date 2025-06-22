@@ -93,40 +93,25 @@
     userIsInteracting: false,
   };
 
-  // Obsługa myszy dla obracania modelu i panowania (środkowy przycisk)
+  // Obsługa myszy dla obracania modelu
   let previousMouseX = 0;
   let previousMouseY = 0;
 
-  let isPanning = false;
-  let panStart = new THREE.Vector2();
-  let panEnd = new THREE.Vector2();
-
   function onMouseDown(event) {
-    if (event.button === 1) { // środkowy przycisk myszy (scroll)
-      isPanning = true;
-      panStart.set(event.clientX, event.clientY);
-    } else {
-      controls.userIsInteracting = true;
-      previousMouseX = event.clientX;
-      previousMouseY = event.clientY;
-    }
+    controls.userIsInteracting = true;
+    previousMouseX = event.clientX;
+    previousMouseY = event.clientY;
   }
 
   function onMouseMove(event) {
-    if (isPanning && currentModel) {
-      panEnd.set(event.clientX, event.clientY);
-      const deltaX = (panEnd.x - panStart.x) * 0.005; // czułość przesuwania X
-      const deltaY = (panEnd.y - panStart.y) * 0.005; // czułość przesuwania Y
-      currentModel.position.x += deltaX;
-      currentModel.position.y -= deltaY;
-      panStart.copy(panEnd);
-    } else if (controls.userIsInteracting && currentModel) {
+    if (controls.userIsInteracting && currentModel) {
       const deltaX = event.clientX - previousMouseX;
       const deltaY = event.clientY - previousMouseY;
 
       currentModel.rotation.y += deltaX * 0.005;
       currentModel.rotation.x += deltaY * 0.003;
 
+      // Ograniczenie kąta obracania góra-dół (X) żeby nie przekręcać zbyt mocno
       currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
 
       previousMouseX = event.clientX;
@@ -134,12 +119,8 @@
     }
   }
 
-  function onMouseUp(event) {
-    if (event.button === 1) {
-      isPanning = false;
-    } else {
-      controls.userIsInteracting = false;
-    }
+  function onMouseUp() {
+    controls.userIsInteracting = false;
   }
 
   window.addEventListener("mousedown", onMouseDown);
@@ -163,6 +144,9 @@
     targetCameraZ += event.deltaY * zoomSpeed; // event.deltaY dodatnie = scroll w dół
     targetCameraZ = clamp(targetCameraZ, minCameraZ, maxCameraZ);
   });
+
+  // Globalna zmienna na środek modelu (do centrowania kamery)
+  let modelCenter = new THREE.Vector3(0, 0, 0);
 
   function loadModel(path) {
     console.log("🔄 Ładowanie modelu:", path);
@@ -193,11 +177,11 @@
 
         const box = new THREE.Box3().setFromObject(currentModel);
         const size = box.getSize(new THREE.Vector3()).length();
-        const center = box.getCenter(new THREE.Vector3());
+        modelCenter = box.getCenter(new THREE.Vector3());
 
-        camera.position.set(center.x, center.y + size * 0.5, size * 1.5);
-        targetCameraZ = camera.position.z; // reset zoomu po załadowaniu modelu
-        camera.lookAt(center);
+        camera.position.set(modelCenter.x, modelCenter.y + size * 0.5, size * 1.5);
+        targetCameraZ = camera.position.z;
+        camera.lookAt(modelCenter);
 
         loadingOverlay.style.display = "none";
       },
@@ -220,8 +204,13 @@
     // Płynne przesuwanie kamery w osi Z (zoom)
     camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
 
+    // Kamera zawsze patrzy na środek modelu
+    if (currentModel) {
+      camera.lookAt(modelCenter);
+    }
+
     // Wolny automatyczny obrót modelu tylko jeśli nie interakcja użytkownika
-    if (currentModel && !controls.userIsInteracting && !isPanning) {
+    if (currentModel && !controls.userIsInteracting) {
       currentModel.rotation.y += 0.0005;
     }
 
