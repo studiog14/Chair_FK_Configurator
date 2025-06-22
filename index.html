@@ -26,15 +26,21 @@
     import { GLTFLoader } from 'https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/loaders/GLTFLoader.js';
 
     const scene = new THREE.Scene();
+
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-    camera.position.set(0, 1, 3);
+    camera.position.set(0, 1, 5);
 
     const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     document.body.appendChild(renderer.domElement);
 
-    const light = new THREE.HemisphereLight(0xffffff, 0x444444, 1);
-    scene.add(light);
+    // Światła: ambient + directional
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambientLight);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
+    directionalLight.position.set(5, 10, 7);
+    scene.add(directionalLight);
 
     const loader = new GLTFLoader();
     let currentModel;
@@ -58,6 +64,17 @@
         currentModel.position.set(0, 0, 0);
         currentModel.scale.set(1, 1, 1);
         scene.add(currentModel);
+
+        // Dopasuj kamerę do modelu
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const size = box.getSize(new THREE.Vector3()).length();
+        const center = box.getCenter(new THREE.Vector3());
+
+        // Przesuń kamerę tak, żeby model był w polu widzenia
+        camera.position.set(center.x, center.y, size * 1.5);
+        camera.lookAt(center);
+
+        console.log('Model loaded:', path);
       }, undefined, error => {
         console.error('Error loading model:', error);
       });
