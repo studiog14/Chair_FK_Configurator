@@ -93,25 +93,40 @@
     userIsInteracting: false,
   };
 
-  // Obsługa myszy dla obracania modelu
+  // Obsługa myszy dla obracania modelu i panowania (środkowy przycisk)
   let previousMouseX = 0;
   let previousMouseY = 0;
 
+  let isPanning = false;
+  let panStart = new THREE.Vector2();
+  let panEnd = new THREE.Vector2();
+
   function onMouseDown(event) {
-    controls.userIsInteracting = true;
-    previousMouseX = event.clientX;
-    previousMouseY = event.clientY;
+    if (event.button === 1) { // środkowy przycisk myszy (scroll)
+      isPanning = true;
+      panStart.set(event.clientX, event.clientY);
+    } else {
+      controls.userIsInteracting = true;
+      previousMouseX = event.clientX;
+      previousMouseY = event.clientY;
+    }
   }
 
   function onMouseMove(event) {
-    if (controls.userIsInteracting && currentModel) {
+    if (isPanning && currentModel) {
+      panEnd.set(event.clientX, event.clientY);
+      const deltaX = (panEnd.x - panStart.x) * 0.005; // czułość przesuwania X
+      const deltaY = (panEnd.y - panStart.y) * 0.005; // czułość przesuwania Y
+      currentModel.position.x += deltaX;
+      currentModel.position.y -= deltaY;
+      panStart.copy(panEnd);
+    } else if (controls.userIsInteracting && currentModel) {
       const deltaX = event.clientX - previousMouseX;
       const deltaY = event.clientY - previousMouseY;
 
       currentModel.rotation.y += deltaX * 0.005;
       currentModel.rotation.x += deltaY * 0.003;
 
-      // Ograniczenie kąta obracania góra-dół (X) żeby nie przekręcać zbyt mocno
       currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
 
       previousMouseX = event.clientX;
@@ -119,8 +134,12 @@
     }
   }
 
-  function onMouseUp() {
-    controls.userIsInteracting = false;
+  function onMouseUp(event) {
+    if (event.button === 1) {
+      isPanning = false;
+    } else {
+      controls.userIsInteracting = false;
+    }
   }
 
   window.addEventListener("mousedown", onMouseDown);
@@ -202,7 +221,7 @@
     camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
 
     // Wolny automatyczny obrót modelu tylko jeśli nie interakcja użytkownika
-    if (currentModel && !controls.userIsInteracting) {
+    if (currentModel && !controls.userIsInteracting && !isPanning) {
       currentModel.rotation.y += 0.0005;
     }
 
@@ -230,6 +249,7 @@
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 </script>
+
 
   </body>
 </html>
