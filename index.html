@@ -1,69 +1,70 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="pl">
   <head>
     <meta charset="UTF-8" />
-    <title>3D Configurator</title>
+    <title>Konfigurator krzeseł</title>
     <style>
       body {
         margin: 0;
+        font-family: sans-serif;
         display: flex;
         height: 100vh;
-        font-family: sans-serif;
+        overflow: hidden;
       }
 
       #viewer {
         flex: 1;
-        background: #ffffff;
+        background-color: #f9f9f9;
+        position: relative;
       }
 
       #ui {
         width: 510px;
-        background: #fff;
-        padding: 20px;
+        background-color: #fff;
         overflow-y: auto;
-        box-shadow: -2px 0 5px rgba(0, 0, 0, 0.1);
-      }
-
-      .section {
-        margin-bottom: 20px;
-      }
-
-      .section h3 {
-        margin-top: 0;
-      }
-
-      .item-tile {
-        display: inline-block;
-        width: 100px;
-        margin: 5px;
-        cursor: pointer;
-        text-align: center;
-      }
-
-      .item-tile img {
-        width: 100%;
-        height: auto;
-        border-radius: 6px;
-        box-shadow: 0 0 3px rgba(0, 0, 0, 0.2);
+        padding: 20px;
+        border-left: 1px solid #ddd;
       }
 
       #loadingOverlay {
-        position: fixed;
+        position: absolute;
         top: 0;
         left: 0;
-        right: 0;
+        right: 510px;
         bottom: 0;
-        background: white;
-        color: black;
-        font-size: 24px;
-        display: flex;
-        justify-content: center;
+        background: rgba(255, 255, 255, 0.85);
+        display: none;
         align-items: center;
-        z-index: 1000;
-        user-select: none;
-        font-family: sans-serif;
+        justify-content: center;
+        font-size: 1.5em;
+        color: #333;
+        z-index: 1;
+      }
+
+      .tile {
+        width: 140px;
+        margin: 10px;
+        display: inline-block;
+        cursor: pointer;
+      }
+
+      .tile img {
+        width: 100%;
+        height: auto;
+        border-radius: 6px;
+        box-shadow: 0 0 4px rgba(0,0,0,0.1);
+      }
+
+      .tile div {
+        text-align: center;
+        margin-top: 5px;
+      }
+
+      h3 {
+        margin-top: 0;
       }
     </style>
+
     <script type="importmap">
       {
         "imports": {
@@ -73,23 +74,18 @@
       }
     </script>
   </head>
-
   <body>
-    <div id="viewer"></div>
+    <div id="viewer">
+      <div id="loadingOverlay">Loading 3D model...</div>
+    </div>
     <div id="ui"></div>
-    <div id="loadingOverlay">Loading 3D model...</div>
 
     <script type="module">
       import * as THREE from "three";
       import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
       const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(
-        45,
-        window.innerWidth / window.innerHeight,
-        0.1,
-        100
-      );
+      const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth - 510, window.innerHeight);
       document.getElementById("viewer").appendChild(renderer.domElement);
@@ -103,8 +99,14 @@
 
       const loader = new GLTFLoader();
       let currentModel;
-
+      let modelCenter = new THREE.Vector3(0, 0, 0);
       const loadingOverlay = document.getElementById("loadingOverlay");
+
+      let targetCameraZ = camera.position.z = 5;
+      const minCameraZ = 0.6;
+      const maxCameraZ = 1.8;
+      const zoomSpeed = 0.001;
+      const zoomLerpFactor = 0.1;
 
       const controls = { userIsInteracting: false };
       let previousMouseX = 0;
@@ -138,19 +140,11 @@
       window.addEventListener("mousemove", onMouseMove);
       window.addEventListener("mouseup", onMouseUp);
 
-      let targetCameraZ = camera.position.z = 5;
-      const minCameraZ = 0.6;
-      const maxCameraZ = 1.8;
-      const zoomSpeed = 0.001;
-      const zoomLerpFactor = 0.1;
-
       window.addEventListener("wheel", (event) => {
         if (!currentModel) return;
         targetCameraZ += event.deltaY * zoomSpeed;
         targetCameraZ = Math.min(Math.max(targetCameraZ, minCameraZ), maxCameraZ);
       });
-
-      let modelCenter = new THREE.Vector3(0, 0, 0);
 
       function loadModel(name) {
         const path = `chairs/${name}.glb`;
@@ -161,11 +155,8 @@
           currentModel.traverse((child) => {
             if (child.geometry) child.geometry.dispose();
             if (child.material) {
-              if (Array.isArray(child.material)) {
-                child.material.forEach((mat) => mat.dispose());
-              } else {
-                child.material.dispose();
-              }
+              if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
+              else child.material.dispose();
             }
           });
         }
@@ -174,17 +165,16 @@
           path,
           (gltf) => {
             currentModel = gltf.scene;
-            currentModel.position.set(0, 0, 0);
-            currentModel.scale.set(1, 1, 1);
             scene.add(currentModel);
 
             const box = new THREE.Box3().setFromObject(currentModel);
             const size = box.getSize(new THREE.Vector3()).length();
             modelCenter = box.getCenter(new THREE.Vector3());
 
-            camera.position.set(modelCenter.x, modelCenter.y + size * 0.5, size * 1.5);
+            currentModel.position.sub(modelCenter);
+            camera.position.set(0, size * 0.2, size * 1.2);
             targetCameraZ = camera.position.z;
-            camera.lookAt(modelCenter);
+            camera.lookAt(0, 0, 0);
 
             loadingOverlay.style.display = "none";
           },
@@ -192,6 +182,7 @@
           (error) => {
             console.error("❌ Błąd ładowania modelu:", error);
             loadingOverlay.textContent = "❌ Error loading model";
+            loadingOverlay.style.display = "flex";
           }
         );
       }
@@ -203,6 +194,7 @@
         if (currentModel && !controls.userIsInteracting) currentModel.rotation.y += 0.0005;
         renderer.render(scene, camera);
       }
+
       animate();
 
       async function loadSheetData() {
@@ -213,13 +205,12 @@
 
       function createTile(item) {
         const tile = document.createElement("div");
-        tile.className = "item-tile";
-        const img = document.createElement("img");
-        img.src = item.Obraz; // Link do miniatury w arkuszu
-        const label = document.createElement("div");
-        label.textContent = item.Nazwa;
-        tile.appendChild(img);
-        tile.appendChild(label);
+        tile.className = "tile";
+        tile.setAttribute("data-nazwa", item.Nazwa);
+        tile.innerHTML = `
+          <img src="${item.Obrazek}" alt="${item.Nazwa}" onerror="this.style.display='none'" />
+          <div>${item.Nazwa}</div>
+        `;
         tile.addEventListener("click", () => loadModel(item.Nazwa));
         return tile;
       }
@@ -227,11 +218,9 @@
       async function initUI() {
         const ui = document.getElementById("ui");
         const data = await loadSheetData();
-
         const chairs = data.filter((item) => item.Grupa === "krzesło" || item.Grupa === "kubełek");
 
         const section = document.createElement("div");
-        section.className = "section";
         const header = document.createElement("h3");
         header.textContent = "Wybierz krzesło";
         section.appendChild(header);
