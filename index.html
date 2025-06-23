@@ -88,6 +88,8 @@
       const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth - 510, window.innerHeight);
+      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       document.getElementById("viewer").appendChild(renderer.domElement);
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -95,7 +97,21 @@
 
       const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
       directionalLight.position.set(5, 10, 7);
+      directionalLight.castShadow = true;
+      directionalLight.shadow.mapSize.width = 1024;
+      directionalLight.shadow.mapSize.height = 1024;
+      directionalLight.shadow.camera.near = 0.5;
+      directionalLight.shadow.camera.far = 50;
       scene.add(directionalLight);
+
+      const shadowPlane = new THREE.Mesh(
+  new THREE.PlaneGeometry(10, 10),
+  new THREE.ShadowMaterial({ opacity: 0.25 })
+);
+shadowPlane.rotation.x = -Math.PI / 2;
+shadowPlane.position.y = -0.01;
+shadowPlane.receiveShadow = true;
+scene.add(shadowPlane);
 
       const loader = new GLTFLoader();
       let currentModel;
@@ -166,15 +182,32 @@
           (gltf) => {
             currentModel = gltf.scene;
             scene.add(currentModel);
+            currentModel.traverse((child) => {
+  if (child.isMesh) {
+    child.castShadow = true;
+    child.receiveShadow = false;
+  }
+});
 
             const box = new THREE.Box3().setFromObject(currentModel);
-            const size = box.getSize(new THREE.Vector3()).length();
-            modelCenter = box.getCenter(new THREE.Vector3());
+const sizeVec = box.getSize(new THREE.Vector3());
+const size = sizeVec.length();
+modelCenter = box.getCenter(new THREE.Vector3());
 
-            currentModel.position.sub(modelCenter);
-            camera.position.set(0, size * 0.2, size * 1.2);
-            targetCameraZ = camera.position.z;
-            camera.lookAt(0, 0, 0);
+currentModel.position.sub(modelCenter);
+
+// Dodaj: ponowne obliczenie box po przemieszczeniu modelu
+const newBox = new THREE.Box3().setFromObject(currentModel);
+const modelBottom = newBox.min.y;
+
+// Jeśli masz shadowPlane: ustaw jego pozycję
+if (shadowPlane) {
+  shadowPlane.position.y = modelBottom - 0.01;
+}
+
+camera.position.set(0, size * 0.2, size * 1.2);
+targetCameraZ = camera.position.z;
+camera.lookAt(0, 0, 0);
 
             loadingOverlay.style.display = "none";
           },
