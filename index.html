@@ -88,30 +88,35 @@
       const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
       const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
       renderer.setSize(window.innerWidth - 510, window.innerHeight);
-      renderer.shadowMap.enabled = true;
+      renderer.shadowMap.enabled = false;
       renderer.shadowMap.type = THREE.PCFSoftShadowMap;
       document.getElementById("viewer").appendChild(renderer.domElement);
 
       const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      scene.add(ambientLight);
+scene.add(ambientLight);
 
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 0.8);
-      directionalLight.position.set(5, 10, 7);
-      directionalLight.castShadow = true;
-      directionalLight.shadow.mapSize.width = 1024;
-      directionalLight.shadow.mapSize.height = 1024;
-      directionalLight.shadow.camera.near = 0.5;
-      directionalLight.shadow.camera.far = 50;
-      scene.add(directionalLight);
+const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85);
+directionalLight.position.set(5, 10, 7);
+directionalLight.castShadow = false;
 
-      const shadowPlane = new THREE.Mesh(
-  new THREE.PlaneGeometry(10, 10),
-  new THREE.ShadowMaterial({ opacity: 0.25 })
-);
-shadowPlane.rotation.x = -Math.PI / 2;
-shadowPlane.position.y = -0.01;
-shadowPlane.receiveShadow = true;
-scene.add(shadowPlane);
+
+
+// Zakres kamery światła
+const d = 3;
+directionalLight.shadow.camera.left = -d;
+directionalLight.shadow.camera.right = d;
+directionalLight.shadow.camera.top = d;
+directionalLight.shadow.camera.bottom = -d;
+directionalLight.shadow.camera.near = 0.5;
+directionalLight.shadow.camera.far = 25;
+
+scene.add(directionalLight);
+
+
+
+
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 
       const loader = new GLTFLoader();
       let currentModel;
