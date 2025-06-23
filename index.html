@@ -117,6 +117,13 @@
   margin-top: 4px;
 }
 
+html, body {
+  overflow: hidden;
+  height: 100%;
+}
+
+
+
     </style>
 
     <script type="importmap">
@@ -320,6 +327,12 @@
         camera.updateProjectionMatrix();
         renderer.setSize(window.innerWidth - 510, window.innerHeight);
       });
+
+      document.addEventListener('wheel', function(e) {
+    // Zatrzymaj scroll, by nie wychodził poza iframe
+    e.preventDefault();
+  }, { passive: false });
+
     </script>
   </body>
 </html>
