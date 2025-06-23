@@ -42,7 +42,7 @@
 
   #loadingContent {
     display: flex;
-    flex-direction: column; /* wszystko pionowo */
+    flex-direction: column;
     align-items: center;
     gap: 20px;
     text-align: center;
@@ -67,16 +67,14 @@
     opacity: 0.8;
   }
 
-  /* animacja obracania */
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
   }
 
-  /* spinner - kółko */
   #loadingOverlay .spinner {
-    border: 5px solid #f3f3f3; /* jasnoszary */
-    border-top: 5px solid #5c5c5c; /* ciemny szary */
+    border: 5px solid #f3f3f3;
+    border-top: 5px solid #5c5c5c;
     border-radius: 50%;
     width: 50px;
     height: 50px;
@@ -85,59 +83,7 @@
   }
 
   .tile {
-  width: 100px; /* zmniejszona szerokość */
-  margin: 6px;
-  display: inline-block;
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  padding: 4px;
-  border-radius: 6px;
-  user-select: none;
-}
-
-.tile img {
-  width: 100%;
-  height: auto;
-  border-radius: 4px;
-  box-shadow: 0 0 3px rgba(0,0,0,0.1);
-}
-
-.tile div {
-  font-size: 0.75em; /* mniejszy podpis pod kafelkiem */
-  margin-top: 4px;
-  text-align: center;
-}
-
-
-  .tile-price {
-    font-size: 0.9em;
-    color: #555;
-    margin-top: 4px;
-  }
-
-  .tile.hover {
-    border-color: #888;
-    box-shadow: 0 0 6px rgba(0,0,0,0.15);
-  }
-
-  .tile.selected {
-    border-color: #2e2e2e;
-    box-shadow: 0 0 10px #313131;
-    background-color: #e7f1ff;
-  }
-
-  h3 {
-    margin-top: 0;
-  }
-
-  html, body {
-    overflow: hidden;
-    height: 100%;
-  }
-
-  .tile {
-    width: 100px;               /* kompaktowa wielkość */
+    width: 100px;
     margin: 6px;
     display: inline-block;
     cursor: pointer;
@@ -170,7 +116,6 @@
     margin-top: 2px;
   }
 
-  /* Styl zaznaczenia i hovera */
   .tile.hover {
     border-color: #888;
     box-shadow: 0 0 6px rgba(0,0,0,0.15);
@@ -193,8 +138,49 @@
     background-color: rgba(85, 85, 85, 0.15);
   }
 
-  
+  h3 {
+    margin-top: 0;
+  }
+
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
+
+  /* Przycisk głównej kategorii (Krzesło, Nogi, Materiały itd.) */
+  .main-category-btn {
+    width: 100px;
+    margin: 6px;
+    padding: 6px 4px;
+    font-size: 0.75em;
+    display: inline-block;
+    text-align: center;
+    background-color: #fff;
+    border: 2px solid transparent;
+    border-radius: 6px;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+    cursor: pointer;
+    user-select: none;
+    box-shadow: 0 0 3px rgba(0,0,0,0.05);
+  }
+
+  .main-category-btn:hover {
+    background-color: rgba(0, 120, 215, 0.08);
+    border-color: #6b6b6b;
+  }
+
+  .main-category-btn:focus {
+    outline: none;
+    border-color: #555555;
+    background-color: rgba(85, 85, 85, 0.15);
+  }
+
+  .main-category-btn.active {
+    border-color: #2e2e2e;
+    background-color: rgba(102, 102, 102, 0.15);
+  }
 </style>
+
 
 
     </style>
