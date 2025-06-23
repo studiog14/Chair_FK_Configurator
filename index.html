@@ -122,7 +122,37 @@ html, body {
   height: 100%;
 }
 
+ <style>
+  /* Styl dla wszystkich kafelków (tiles) i głównych przycisków kategorii */
+  .tile,
+  .main-category-btn {
+    border-radius: 10px;
+    border: 2.5px solid transparent;
+    transition: background-color 0.25s ease, border-color 0.25s ease;
+    cursor: pointer;
+  }
 
+  /* Aktywne zaznaczenie (prostokąt z zaokrąglonymi rogami) */
+  .active {
+    border-color: #0078d7;
+    background-color: rgba(0, 120, 215, 0.15);
+  }
+
+  /* Efekt hover dla wszystkich przycisków i kafelków */
+  .tile:hover,
+  .main-category-btn:hover {
+    background-color: rgba(0, 120, 215, 0.08);
+    border-color: #3399ff;
+  }
+
+  /* Usunięcie domyślnego outline na focus - zamiast niego ramka */
+  .tile:focus,
+  .main-category-btn:focus {
+    outline: none;
+    border-color: #0078d7;
+    background-color: rgba(0, 120, 215, 0.15);
+  }
+</style>
 
     </style>
 
@@ -293,18 +323,9 @@ html, body {
     return tile;
   }
 
-  // Nowa funkcja tworząca przyciski ikon materiałów
-  function initMaterialButtons() {
-    const materialSection = document.getElementById("section-materials");
-    if (!materialSection) return;
-
-    const buttonsContainer = document.createElement("div");
-    buttonsContainer.id = "materialButtons";
-    buttonsContainer.style.display = "flex";
-    buttonsContainer.style.justifyContent = "space-around";
-    buttonsContainer.style.marginTop = "15px";
-    buttonsContainer.style.marginBottom = "20px";
-
+  // --- Nowa funkcja do przycisków elementów krzesła z ikonami ---
+  function initMaterialButtons(container) {
+    // Tu podmieniaj ścieżki ikon na swoje pliki
     const materialTypes = [
       { id: "seat", label: "Siedzisko", iconSrc: "icons/seat.png" },
       { id: "legs", label: "Nogi", iconSrc: "icons/legs.png" },
@@ -312,50 +333,89 @@ html, body {
       { id: "back_outer", label: "Oparcie zewnętrzne", iconSrc: "icons/back_outer.png" },
     ];
 
-    materialTypes.forEach(({ id, label, iconSrc }) => {
-      const btn = document.createElement("button");
-      btn.className = "material-button";
-      btn.id = `material-btn-${id}`;
-      btn.title = label;
+    const btnGroup = document.createElement("div");
+    btnGroup.style.display = "flex";
+    btnGroup.style.gap = "8px";
+    btnGroup.style.marginBottom = "10px";
 
-      btn.style.border = "none";
-      btn.style.background = "transparent";
+    materialTypes.forEach((mat) => {
+      const btn = document.createElement("button");
+      btn.className = "material-part-button";
+      btn.title = mat.label;
+      btn.style.flex = "1";
+      btn.style.padding = "6px";
+      btn.style.display = "flex";
+      btn.style.flexDirection = "column";
+      btn.style.alignItems = "center";
+      btn.style.border = "1px solid #ccc";
+      btn.style.borderRadius = "4px";
+      btn.style.background = "#fff";
       btn.style.cursor = "pointer";
 
-      btn.innerHTML = `<img src="${iconSrc}" alt="${label}" style="width: 40px; height: 40px;">`;
+      btn.innerHTML = `
+        <img src="${mat.iconSrc}" alt="${mat.label}" style="width:24px; height:24px; margin-bottom:4px;" />
+        <span style="font-size: 12px;">${mat.label}</span>
+      `;
 
       btn.addEventListener("click", () => {
-        console.log(`Wybrano materiał: ${label}`);
-        // Tutaj możesz dodać logikę wyboru materiału dla danego elementu krzesła
+        // Tutaj możesz dodać obsługę kliknięcia na element krzesła
+        console.log("Wybrano element:", mat.id);
       });
 
-      buttonsContainer.appendChild(btn);
+      btnGroup.appendChild(btn);
     });
 
-    // Wstawiamy przyciski na górę sekcji materiałów, pod nagłówkiem
-    materialSection.insertBefore(buttonsContainer, materialSection.children[1]);
+    container.appendChild(btnGroup);
   }
 
   async function initUI() {
     const ui = document.getElementById("ui");
 
-    // Kontener przycisków kategorii
-    const buttonsContainer = document.createElement("div");
-    buttonsContainer.style.display = "flex";
-    buttonsContainer.style.gap = "10px";
-    buttonsContainer.style.marginBottom = "20px";
+    // Kontener przycisków głównych kategorii z ikonami
+const buttonsContainer = document.createElement("div");
+buttonsContainer.style.display = "flex";
+buttonsContainer.style.gap = "15px";
+buttonsContainer.style.marginBottom = "20px";
+buttonsContainer.style.justifyContent = "center"; // wyśrodkowanie
 
-    const chairBtn = document.createElement("button");
-    chairBtn.textContent = "Krzesła";
-    chairBtn.style.flex = "1";
-    chairBtn.onclick = () => showCategory("chairs");
+const chairBtn = document.createElement("button");
+chairBtn.className = "main-category-btn";
+chairBtn.innerHTML = `
+  <img src="icons/chair_icon.png" alt="Krzesła" />
+  <span>Krzesła</span>
+`;
 
-    const materialsBtn = document.createElement("button");
-    materialsBtn.textContent = "Materiały";
-    materialsBtn.style.flex = "1";
-    materialsBtn.onclick = () => showCategory("materials");
+const materialsBtn = document.createElement("button");
+materialsBtn.className = "main-category-btn";
+materialsBtn.innerHTML = `
+  <img src="icons/fabric_icon.png" alt="Materiały" />
+  <span>Materiały</span>
+`;
 
-    buttonsContainer.appendChild(chairBtn);
+// Funkcja do zmiany aktywnego przycisku
+function setActiveButton(activeBtn) {
+  [chairBtn, materialsBtn].forEach(btn => {
+    btn.classList.toggle("active", btn === activeBtn);
+  });
+}
+
+// Podpięcie kliknięć i ustawienie aktywnego stylu
+chairBtn.onclick = () => {
+  showCategory("chairs");
+  setActiveButton(chairBtn);
+};
+materialsBtn.onclick = () => {
+  showCategory("materials");
+  setActiveButton(materialsBtn);
+};
+
+buttonsContainer.appendChild(chairBtn);
+buttonsContainer.appendChild(materialsBtn);
+ui.appendChild(buttonsContainer);
+
+// Domyślnie aktywny pierwszy przycisk
+setActiveButton(chairBtn);
+
     buttonsContainer.appendChild(materialsBtn);
     ui.appendChild(buttonsContainer);
 
@@ -385,14 +445,17 @@ html, body {
     const header2 = document.createElement("h3");
     header2.textContent = "Wybierz materiał";
     materialSection.appendChild(header2);
+
+    // Dodaj przyciski wyboru elementów krzesła z ikonami
+    initMaterialButtons(materialSection);
+
+    // Dodaj kafelki materiałów
     materials.forEach(item => {
       const tile = createTile(item);
       materialSection.appendChild(tile);
     });
-    ui.appendChild(materialSection);
 
-    // Dodajemy przyciski podziału materiałów na elementy
-    initMaterialButtons();
+    ui.appendChild(materialSection);
 
     // Załaduj domyślnie pierwszy model z krzeseł
     if (chairs.length > 0) loadModel(chairs[0].Nazwa);
