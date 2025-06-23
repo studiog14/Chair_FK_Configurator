@@ -110,6 +110,13 @@
       h3 {
         margin-top: 0;
       }
+
+      .tile-price {
+  font-size: 0.9em;
+  color: #555;
+  margin-top: 4px;
+}
+
     </style>
 
     <script type="importmap">
@@ -277,9 +284,11 @@
         tile.className = "tile";
         tile.setAttribute("data-nazwa", item.Nazwa);
         tile.innerHTML = `
-          <img src="${item.Obrazek}" alt="${item.Nazwa}" onerror="this.style.display='none'" />
-          <div>${item.Nazwa}</div>
-        `;
+  <img src="${item.Obrazek}" alt="${item.Nazwa}" />
+  <div class="tile-title">${item.Nazwa}</div>
+  <div class="tile-price">${item.Cena ? item.Cena + ' zł' : ''}</div>
+`;
+
         tile.addEventListener("click", () => loadModel(item.Nazwa));
         return tile;
       }
