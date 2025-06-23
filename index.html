@@ -136,35 +136,64 @@
     height: 100%;
   }
 
-  /* Styl dla wszystkich kafelków (tiles) i głównych przycisków kategorii */
-  .tile,
-  .main-category-btn {
-    border-radius: 10px;
-    border: 2.5px solid transparent;
-    transition: background-color 0.25s ease, border-color 0.25s ease;
+  .tile {
+    width: 100px;               /* kompaktowa wielkość */
+    margin: 6px;
+    display: inline-block;
     cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    padding: 4px;
+    border-radius: 6px;
+    user-select: none;
+    background-color: #fff;
+    text-align: center;
   }
 
-  /* Aktywne zaznaczenie (prostokąt z zaokrąglonymi rogami) */
-  .active {
-    border-color: #353535;
-    background-color: rgba(102, 102, 102, 0.15);
+  .tile img {
+    width: 100%;
+    height: auto;
+    border-radius: 4px;
+    box-shadow: 0 0 3px rgba(0,0,0,0.1);
+    object-fit: contain;
   }
 
-  /* Efekt hover dla wszystkich przycisków i kafelków */
-  .tile:hover,
-  .main-category-btn:hover {
+  .tile div {
+    font-size: 0.75em;
+    margin-top: 4px;
+    color: #333;
+  }
+
+  .tile-price {
+    font-size: 0.7em;
+    color: #666;
+    margin-top: 2px;
+  }
+
+  /* Styl zaznaczenia i hovera */
+  .tile.hover {
+    border-color: #888;
+    box-shadow: 0 0 6px rgba(0,0,0,0.15);
+  }
+
+  .tile.selected {
+    border-color: #2e2e2e;
+    box-shadow: 0 0 10px #313131;
+    background-color: #e7f1ff;
+  }
+
+  .tile:hover {
     background-color: rgba(0, 120, 215, 0.08);
     border-color: #6b6b6b;
   }
 
-  /* Usunięcie domyślnego outline na focus - zamiast niego ramka */
-  .tile:focus,
-  .main-category-btn:focus {
+  .tile:focus {
     outline: none;
     border-color: #555555;
     background-color: rgba(85, 85, 85, 0.15);
   }
+
+  
 </style>
 
 
