@@ -81,206 +81,183 @@
     <div id="ui"></div>
 
     <script type="module">
-      import * as THREE from "three";
-      import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
+  import * as THREE from "three";
+  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
-      const scene = new THREE.Scene();
-      const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
-      const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-      renderer.setSize(window.innerWidth - 510, window.innerHeight);
-      renderer.shadowMap.enabled = false;
-      renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-      document.getElementById("viewer").appendChild(renderer.domElement);
+  const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+  renderer.setSize(window.innerWidth - 510, window.innerHeight);
+  // **shadowMap wyłączone**
+  renderer.shadowMap.enabled = false;
+  document.getElementById("viewer").appendChild(renderer.domElement);
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-scene.add(ambientLight);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+  scene.add(ambientLight);
 
-const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85);
-directionalLight.position.set(5, 10, 7);
-directionalLight.castShadow = false;
+  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85);
+  directionalLight.position.set(5, 10, 7);
+  // **shadow wyłączony**
+  directionalLight.castShadow = false;
+  scene.add(directionalLight);
 
+  const loader = new GLTFLoader();
+  let currentModel;
+  let modelCenter = new THREE.Vector3(0, 0, 0);
+  const loadingOverlay = document.getElementById("loadingOverlay");
 
+  let targetCameraZ = camera.position.z = 5;
+  const minCameraZ = 0.6;
+  const maxCameraZ = 1.8;
+  const zoomSpeed = 0.001;
+  const zoomLerpFactor = 0.1;
 
-// Zakres kamery światła
-const d = 3;
-directionalLight.shadow.camera.left = -d;
-directionalLight.shadow.camera.right = d;
-directionalLight.shadow.camera.top = d;
-directionalLight.shadow.camera.bottom = -d;
-directionalLight.shadow.camera.near = 0.5;
-directionalLight.shadow.camera.far = 25;
+  const controls = { userIsInteracting: false };
+  let previousMouseX = 0;
+  let previousMouseY = 0;
 
-scene.add(directionalLight);
-
-
-
-
-renderer.shadowMap.enabled = true;
-renderer.shadowMap.type = THREE.PCFSoftShadowMap;
-
-      const loader = new GLTFLoader();
-      let currentModel;
-      let modelCenter = new THREE.Vector3(0, 0, 0);
-      const loadingOverlay = document.getElementById("loadingOverlay");
-
-      let targetCameraZ = camera.position.z = 5;
-      const minCameraZ = 0.6;
-      const maxCameraZ = 1.8;
-      const zoomSpeed = 0.001;
-      const zoomLerpFactor = 0.1;
-
-      const controls = { userIsInteracting: false };
-      let previousMouseX = 0;
-      let previousMouseY = 0;
-
-      function onMouseDown(event) {
-        controls.userIsInteracting = true;
-        previousMouseX = event.clientX;
-        previousMouseY = event.clientY;
-      }
-
-      function onMouseMove(event) {
-        if (controls.userIsInteracting && currentModel) {
-          const deltaX = event.clientX - previousMouseX;
-          const deltaY = event.clientY - previousMouseY;
-
-          currentModel.rotation.y += deltaX * 0.005;
-          currentModel.rotation.x += deltaY * 0.003;
-          currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
-
-          previousMouseX = event.clientX;
-          previousMouseY = event.clientY;
-        }
-      }
-
-      function onMouseUp() {
-        controls.userIsInteracting = false;
-      }
-
-      window.addEventListener("mousedown", onMouseDown);
-      window.addEventListener("mousemove", onMouseMove);
-      window.addEventListener("mouseup", onMouseUp);
-
-      window.addEventListener("wheel", (event) => {
-        if (!currentModel) return;
-        targetCameraZ += event.deltaY * zoomSpeed;
-        targetCameraZ = Math.min(Math.max(targetCameraZ, minCameraZ), maxCameraZ);
-      });
-
-      function loadModel(name) {
-        const path = `chairs/${name}.glb`;
-        loadingOverlay.style.display = "flex";
-
-        if (currentModel) {
-          scene.remove(currentModel);
-          currentModel.traverse((child) => {
-            if (child.geometry) child.geometry.dispose();
-            if (child.material) {
-              if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
-              else child.material.dispose();
-            }
-          });
-        }
-
-        loader.load(
-          path,
-          (gltf) => {
-            currentModel = gltf.scene;
-            scene.add(currentModel);
-            currentModel.traverse((child) => {
-  if (child.isMesh) {
-    child.castShadow = true;
-    child.receiveShadow = false;
+  function onMouseDown(event) {
+    controls.userIsInteracting = true;
+    previousMouseX = event.clientX;
+    previousMouseY = event.clientY;
   }
-});
 
-            const box = new THREE.Box3().setFromObject(currentModel);
-const sizeVec = box.getSize(new THREE.Vector3());
-const size = sizeVec.length();
-modelCenter = box.getCenter(new THREE.Vector3());
+  function onMouseMove(event) {
+    if (controls.userIsInteracting && currentModel) {
+      const deltaX = event.clientX - previousMouseX;
+      const deltaY = event.clientY - previousMouseY;
 
-currentModel.position.sub(modelCenter);
+      currentModel.rotation.y += deltaX * 0.005;
+      currentModel.rotation.x += deltaY * 0.003;
+      currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
 
-// Dodaj: ponowne obliczenie box po przemieszczeniu modelu
-const newBox = new THREE.Box3().setFromObject(currentModel);
-const modelBottom = newBox.min.y;
+      previousMouseX = event.clientX;
+      previousMouseY = event.clientY;
+    }
+  }
 
-// Jeśli masz shadowPlane: ustaw jego pozycję
-if (shadowPlane) {
-  shadowPlane.position.y = modelBottom - 0.01;
-}
+  function onMouseUp() {
+    controls.userIsInteracting = false;
+  }
 
-camera.position.set(0, size * 0.2, size * 1.2);
-targetCameraZ = camera.position.z;
-camera.lookAt(0, 0, 0);
+  window.addEventListener("mousedown", onMouseDown);
+  window.addEventListener("mousemove", onMouseMove);
+  window.addEventListener("mouseup", onMouseUp);
 
-            loadingOverlay.style.display = "none";
-          },
-          undefined,
-          (error) => {
-            console.error("❌ Błąd ładowania modelu:", error);
-            loadingOverlay.textContent = "❌ Error loading model";
-            loadingOverlay.style.display = "flex";
+  window.addEventListener("wheel", (event) => {
+    if (!currentModel) return;
+    targetCameraZ += event.deltaY * zoomSpeed;
+    targetCameraZ = Math.min(Math.max(targetCameraZ, minCameraZ), maxCameraZ);
+  });
+
+  function loadModel(name) {
+    const path = `chairs/${name}.glb`;
+    loadingOverlay.style.display = "flex";
+
+    if (currentModel) {
+      scene.remove(currentModel);
+      currentModel.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
+          else child.material.dispose();
+        }
+      });
+    }
+
+    loader.load(
+      path,
+      (gltf) => {
+        currentModel = gltf.scene;
+        scene.add(currentModel);
+
+        currentModel.traverse((child) => {
+          if (child.isMesh) {
+            // Usunięte: castShadow i receiveShadow, bo nie potrzebne
+            // child.castShadow = true;
+            // child.receiveShadow = false;
           }
-        );
-      }
-
-      function animate() {
-        requestAnimationFrame(animate);
-        camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
-        if (currentModel) camera.lookAt(0, 0, 0);
-        if (currentModel && !controls.userIsInteracting) currentModel.rotation.y += 0.0005;
-        renderer.render(scene, camera);
-      }
-
-      animate();
-
-      async function loadSheetData() {
-        const res = await fetch("https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane");
-        const data = await res.json();
-        return data;
-      }
-
-      function createTile(item) {
-        const tile = document.createElement("div");
-        tile.className = "tile";
-        tile.setAttribute("data-nazwa", item.Nazwa);
-        tile.innerHTML = `
-          <img src="${item.Obrazek}" alt="${item.Nazwa}" onerror="this.style.display='none'" />
-          <div>${item.Nazwa}</div>
-        `;
-        tile.addEventListener("click", () => loadModel(item.Nazwa));
-        return tile;
-      }
-
-      async function initUI() {
-        const ui = document.getElementById("ui");
-        const data = await loadSheetData();
-        const chairs = data.filter((item) => item.Grupa === "krzesło" || item.Grupa === "kubełek");
-
-        const section = document.createElement("div");
-        const header = document.createElement("h3");
-        header.textContent = "Wybierz krzesło";
-        section.appendChild(header);
-
-        chairs.forEach((item) => {
-          const tile = createTile(item);
-          section.appendChild(tile);
         });
 
-        ui.appendChild(section);
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const sizeVec = box.getSize(new THREE.Vector3());
+        const size = sizeVec.length();
+        modelCenter = box.getCenter(new THREE.Vector3());
 
-        // Załaduj pierwszy model domyślnie
-        if (chairs.length > 0) loadModel(chairs[0].Nazwa);
+        currentModel.position.sub(modelCenter);
+
+        // Usunięte: shadowPlane i jego pozycjonowanie
+
+        camera.position.set(0, size * 0.2, size * 1.2);
+        targetCameraZ = camera.position.z;
+        camera.lookAt(0, 0, 0);
+
+        loadingOverlay.style.display = "none";
+      },
+      undefined,
+      (error) => {
+        console.error("❌ Błąd ładowania modelu:", error);
+        loadingOverlay.textContent = "❌ Error loading model";
+        loadingOverlay.style.display = "flex";
       }
+    );
+  }
 
-      initUI();
+  function animate() {
+    requestAnimationFrame(animate);
+    camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
+    if (currentModel) camera.lookAt(0, 0, 0);
+    if (currentModel && !controls.userIsInteracting) currentModel.rotation.y += 0.0005;
+    renderer.render(scene, camera);
+  }
 
-      window.addEventListener("resize", () => {
-        camera.aspect = (window.innerWidth - 510) / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth - 510, window.innerHeight);
-      });
-    </script>
+  animate();
+
+  async function loadSheetData() {
+    const res = await fetch("https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane");
+    const data = await res.json();
+    return data;
+  }
+
+  function createTile(item) {
+    const tile = document.createElement("div");
+    tile.className = "tile";
+    tile.setAttribute("data-nazwa", item.Nazwa);
+    tile.innerHTML = `
+      <img src="${item.Obrazek}" alt="${item.Nazwa}" onerror="this.style.display='none'" />
+      <div>${item.Nazwa}</div>
+    `;
+    tile.addEventListener("click", () => loadModel(item.Nazwa));
+    return tile;
+  }
+
+  async function initUI() {
+    const ui = document.getElementById("ui");
+    const data = await loadSheetData();
+    const chairs = data.filter((item) => item.Grupa === "krzesło" || item.Grupa === "kubełek");
+
+    const section = document.createElement("div");
+    const header = document.createElement("h3");
+    header.textContent = "Wybierz krzesło";
+    section.appendChild(header);
+
+    chairs.forEach((item) => {
+      const tile = createTile(item);
+      section.appendChild(tile);
+    });
+
+    ui.appendChild(section);
+
+    if (chairs.length > 0) loadModel(chairs[0].Nazwa);
+  }
+
+  initUI();
+
+  window.addEventListener("resize", () => {
+    camera.aspect = (window.innerWidth - 510) / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth - 510, window.innerHeight);
+  });
+</script>
   </body>
 </html>
