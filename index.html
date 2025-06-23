@@ -4,144 +4,135 @@
     <meta charset="UTF-8" />
     <title>Konfigurator krzeseł</title>
     <style>
-      body {
-        margin: 0;
-        font-family: sans-serif;
-        display: flex;
-        height: 100vh;
-        overflow: hidden;
-      }
+  body {
+    margin: 0;
+    font-family: sans-serif;
+    display: flex;
+    height: 100vh;
+    overflow: hidden;
+  }
 
-      #viewer {
-        flex: 1;
-        background-color: #f9f9f9;
-        position: relative;
-      }
+  #viewer {
+    flex: 1;
+    background-color: #f9f9f9;
+    position: relative;
+  }
 
-      #ui {
-        width: 510px;
-        background-color: #fff;
-        overflow-y: auto;
-        padding: 20px;
-        border-left: 1px solid #ddd;
-      }
+  #ui {
+    width: 510px;
+    background-color: #fff;
+    overflow-y: auto;
+    padding: 20px;
+    border-left: 1px solid #ddd;
+  }
 
-   #loadingOverlay {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background: rgba(255, 255, 255, 0.85);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 1;
-  pointer-events: auto;
-}
+  #loadingOverlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(255, 255, 255, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1;
+    pointer-events: auto;
+  }
 
-#loadingContent {
-  display: flex;
-  flex-direction: column;  /* <-- to ustawia wszystko pionowo */
-  align-items: center;
-  gap: 20px;
-  text-align: center;
-}
+  #loadingContent {
+    display: flex;
+    flex-direction: column; /* wszystko pionowo */
+    align-items: center;
+    gap: 20px;
+    text-align: center;
+  }
 
-#loadingLogo {
-  width: 250px;
-  height: auto;
-  opacity: 0.9;
-}
+  #loadingLogo {
+    width: 250px;
+    height: auto;
+    opacity: 0.9;
+  }
 
-#loadingIcon {
-  width: 50px;
-  height: 50px;
-  animation: spin 1.2s linear infinite;
-  opacity: 0.8;
-}
+  #loadingIcon {
+    width: 50px;
+    height: 50px;
+    animation: spin 1.2s linear infinite;
+    opacity: 0.8;
+  }
 
-#loadingText {
-  font-size: 1.2em;
-  color: #333;
-  opacity: 0.8;
-}
+  #loadingText {
+    font-size: 1.2em;
+    color: #333;
+    opacity: 0.8;
+  }
 
-@keyframes spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
+  /* animacja obracania */
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 
-      /* Spinner - animowane kółko */
-      #loadingOverlay .spinner {
-        border: 5px solid #f3f3f3; /* jasnoszary */
-        border-top: 5px solid #5c5c5c; /* niebieski */
-        border-radius: 50%;
-        width: 50px;
-        height: 50px;
-        animation: spin 1s linear infinite;
-        margin-bottom: 15px;
-      }
+  /* spinner - kółko */
+  #loadingOverlay .spinner {
+    border: 5px solid #f3f3f3; /* jasnoszary */
+    border-top: 5px solid #5c5c5c; /* ciemny szary */
+    border-radius: 50%;
+    width: 50px;
+    height: 50px;
+    animation: spin 1s linear infinite;
+    margin-bottom: 15px;
+  }
 
-      @keyframes spin {
-        0% { transform: rotate(0deg); }
-        100% { transform: rotate(360deg); }
-      }
+  .tile {
+    width: 140px;
+    margin: 10px;
+    display: inline-block;
+    cursor: pointer;
+    border: 2px solid transparent;
+    transition: border-color 0.3s, box-shadow 0.3s;
+    padding: 6px;
+    border-radius: 6px;
+    user-select: none;
+  }
 
-      .tile {
-        width: 140px;
-        margin: 10px;
-        display: inline-block;
-        cursor: pointer;
-      }
+  .tile img {
+    width: 100%;
+    height: auto;
+    border-radius: 6px;
+    box-shadow: 0 0 4px rgba(0,0,0,0.1);
+  }
 
-      .tile img {
-        width: 100%;
-        height: auto;
-        border-radius: 6px;
-        box-shadow: 0 0 4px rgba(0,0,0,0.1);
-      }
+  .tile div {
+    text-align: center;
+    margin-top: 5px;
+  }
 
-      .tile div {
-        text-align: center;
-        margin-top: 5px;
-      }
+  .tile-price {
+    font-size: 0.9em;
+    color: #555;
+    margin-top: 4px;
+  }
 
-      h3 {
-        margin-top: 0;
-      }
+  .tile.hover {
+    border-color: #888;
+    box-shadow: 0 0 6px rgba(0,0,0,0.15);
+  }
 
-      .tile-price {
-  font-size: 0.9em;
-  color: #555;
-  margin-top: 4px;
-}
+  .tile.selected {
+    border-color: #2e2e2e;
+    box-shadow: 0 0 10px #313131;
+    background-color: #e7f1ff;
+  }
 
-html, body {
-  overflow: hidden;
-  height: 100%;
-}
+  h3 {
+    margin-top: 0;
+  }
 
- .tile {
-  cursor: pointer;
-  border: 2px solid transparent;
-  transition: border-color 0.3s, box-shadow 0.3s;
-  padding: 6px;
-  border-radius: 6px;
-  user-select: none;
-}
-
-.tile.hover {
-  border-color: #888;
-  box-shadow: 0 0 6px rgba(0,0,0,0.15);
-}
-
-.tile.selected {
-  border-color: #2e2e2e;
-  box-shadow: 0 0 10px #313131;
-  background-color: #e7f1ff;
-}
-
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
 
   /* Styl dla wszystkich kafelków (tiles) i głównych przycisków kategorii */
   .tile,
@@ -173,6 +164,7 @@ html, body {
     background-color: rgba(85, 85, 85, 0.15);
   }
 </style>
+
 
     </style>
 
@@ -398,9 +390,10 @@ html, body {
       btn.style.cursor = "pointer";
 
       btn.innerHTML = `
-        <img src="${mat.iconSrc}" alt="${mat.label}" style="width:24px; height:24px; margin-bottom:4px;" />
-        <span style="font-size: 12px;">${mat.label}</span>
-      `;
+  <img src="${mat.iconSrc}" alt="${mat.label}" style="width:60px; height:auto; margin-bottom:6px;" />
+  <span style="font-size: 12px;">${mat.label}</span>
+`;
+
 
       btn.addEventListener("click", () => {
         // Podświetlenie przycisku materiału
