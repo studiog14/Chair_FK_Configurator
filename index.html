@@ -122,7 +122,27 @@ html, body {
   height: 100%;
 }
 
- <style>
+ .tile {
+  cursor: pointer;
+  border: 2px solid transparent;
+  transition: border-color 0.3s, box-shadow 0.3s;
+  padding: 6px;
+  border-radius: 6px;
+  user-select: none;
+}
+
+.tile.hover {
+  border-color: #888;
+  box-shadow: 0 0 6px rgba(0,0,0,0.15);
+}
+
+.tile.selected {
+  border-color: #007bff;
+  box-shadow: 0 0 10px #007bff;
+  background-color: #e7f1ff;
+}
+
+
   /* Styl dla wszystkich kafelków (tiles) i głównych przycisków kategorii */
   .tile,
   .main-category-btn {
@@ -177,7 +197,7 @@ html, body {
 </div>
 <div id="ui"></div>
 
-    <script type="module">
+   <script type="module">
   import * as THREE from "three";
   import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
 
@@ -246,53 +266,52 @@ html, body {
   });
 
   function loadModel(name) {
-    const path = `chairs/${name}.glb`;
-    loadingOverlay.style.display = "flex";
+  const path = `chairs/${name}.glb`;
+  loadingOverlay.style.display = "flex";
 
-    if (currentModel) {
-      scene.remove(currentModel);
-      currentModel.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-          if (Array.isArray(child.material)) child.material.forEach((mat) => mat.dispose());
-          else child.material.dispose();
+  if (currentModel) {
+    scene.remove(currentModel);
+    currentModel.traverse((child) => {
+      if (child.geometry) child.geometry.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((mat) => mat.dispose());
+        } else {
+          child.material.dispose();
         }
-      });
-    }
-
-    loader.load(
-      path,
-      (gltf) => {
-        currentModel = gltf.scene;
-        scene.add(currentModel);
-
-        currentModel.traverse((child) => {
-          if (child.isMesh) {
-            // shadow disabled
-          }
-        });
-
-        const box = new THREE.Box3().setFromObject(currentModel);
-        const sizeVec = box.getSize(new THREE.Vector3());
-        const size = sizeVec.length();
-        modelCenter = box.getCenter(new THREE.Vector3());
-
-        currentModel.position.sub(modelCenter);
-
-        camera.position.set(0, size * 0.2, size * 1.2);
-        targetCameraZ = camera.position.z;
-        camera.lookAt(0, 0, 0);
-
-        loadingOverlay.style.display = "none";
-      },
-      undefined,
-      (error) => {
-        console.error("❌ Błąd ładowania modelu:", error);
-        loadingOverlay.innerHTML = "❌ Błąd ładowania modelu";
-        loadingOverlay.style.display = "flex";
       }
-    );
+    });
+    currentModel = null; // ważne - wyczyść referencję
   }
+
+  loader.load(
+    path,
+    (gltf) => {
+      currentModel = gltf.scene;
+      scene.add(currentModel);
+
+      const box = new THREE.Box3().setFromObject(currentModel);
+      const center = box.getCenter(new THREE.Vector3());
+      currentModel.position.sub(center);
+
+      const sizeVec = box.getSize(new THREE.Vector3());
+      const size = sizeVec.length();
+
+      camera.position.set(0, size * 0.2, size * 1.2);
+      targetCameraZ = camera.position.z;
+      camera.lookAt(0, 0, 0);
+
+      loadingOverlay.style.display = "none";
+    },
+    undefined,
+    (error) => {
+      console.error("❌ Błąd ładowania modelu:", error);
+      loadingOverlay.innerHTML = "❌ Błąd ładowania modelu";
+      loadingOverlay.style.display = "flex";
+    }
+  );
+}
+
 
   function animate() {
     requestAnimationFrame(animate);
@@ -310,7 +329,7 @@ html, body {
     return data;
   }
 
-  function createTile(item) {
+  function createTile(item, category) {
     const tile = document.createElement("div");
     tile.className = "tile";
     tile.setAttribute("data-nazwa", item.Nazwa);
@@ -319,13 +338,39 @@ html, body {
       <div class="tile-title">${item.Nazwa}</div>
       <div class="tile-price">${item.Cena ? item.Cena + ' zł' : ''}</div>
     `;
-    tile.addEventListener("click", () => loadModel(item.Nazwa));
+
+    tile.addEventListener("click", () => {
+      if (category === "chairs") {
+        loadModel(item.Nazwa);
+      } else if (category === "materials") {
+        // Obsługa materiałów – dodaj tutaj jakąś logikę
+        console.log("Wybrano materiał:", item.Nazwa);
+      }
+      setSelectedTile(category, tile);
+    });
+
+    tile.addEventListener("mouseenter", () => {
+      tile.classList.add("hover");
+    });
+    tile.addEventListener("mouseleave", () => {
+      tile.classList.remove("hover");
+    });
+
     return tile;
   }
 
-  // --- Nowa funkcja do przycisków elementów krzesła z ikonami ---
+  function setSelectedTile(category, selectedTile) {
+    const containerId = category === "chairs" ? "section-chairs" : "section-materials";
+    const container = document.getElementById(containerId);
+    if (!container) return;
+
+    const tiles = container.querySelectorAll(".tile");
+    tiles.forEach(tile => {
+      tile.classList.toggle("selected", tile === selectedTile);
+    });
+  }
+
   function initMaterialButtons(container) {
-    // Tu podmieniaj ścieżki ikon na swoje pliki
     const materialTypes = [
       { id: "seat", label: "Siedzisko", iconSrc: "icons/seat.png" },
       { id: "legs", label: "Nogi", iconSrc: "icons/legs.png" },
@@ -358,7 +403,9 @@ html, body {
       `;
 
       btn.addEventListener("click", () => {
-        // Tutaj możesz dodać obsługę kliknięcia na element krzesła
+        // Podświetlenie przycisku materiału
+        [...btnGroup.children].forEach(sib => sib.classList.remove("selected"));
+        btn.classList.add("selected");
         console.log("Wybrano element:", mat.id);
       });
 
@@ -371,60 +418,50 @@ html, body {
   async function initUI() {
     const ui = document.getElementById("ui");
 
-    // Kontener przycisków głównych kategorii z ikonami
-const buttonsContainer = document.createElement("div");
-buttonsContainer.style.display = "flex";
-buttonsContainer.style.gap = "15px";
-buttonsContainer.style.marginBottom = "20px";
-buttonsContainer.style.justifyContent = "center"; // wyśrodkowanie
+    const buttonsContainer = document.createElement("div");
+    buttonsContainer.style.display = "flex";
+    buttonsContainer.style.gap = "15px";
+    buttonsContainer.style.marginBottom = "20px";
+    buttonsContainer.style.justifyContent = "center";
 
-const chairBtn = document.createElement("button");
-chairBtn.className = "main-category-btn";
-chairBtn.innerHTML = `
-  <img src="icons/chair_icon.png" alt="Krzesła" />
-  <span>Krzesła</span>
-`;
+    const chairBtn = document.createElement("button");
+    chairBtn.className = "main-category-btn active";
+    chairBtn.innerHTML = `
+      <img src="icons/chair_icon.png" alt="Krzesła" />
+      <span>Krzesła</span>
+    `;
 
-const materialsBtn = document.createElement("button");
-materialsBtn.className = "main-category-btn";
-materialsBtn.innerHTML = `
-  <img src="icons/fabric_icon.png" alt="Materiały" />
-  <span>Materiały</span>
-`;
+    const materialsBtn = document.createElement("button");
+    materialsBtn.className = "main-category-btn";
+    materialsBtn.innerHTML = `
+      <img src="icons/fabric_icon.png" alt="Materiały" />
+      <span>Materiały</span>
+    `;
 
-// Funkcja do zmiany aktywnego przycisku
-function setActiveButton(activeBtn) {
-  [chairBtn, materialsBtn].forEach(btn => {
-    btn.classList.toggle("active", btn === activeBtn);
-  });
-}
+    function setActiveButton(activeBtn) {
+      [chairBtn, materialsBtn].forEach(btn => {
+        btn.classList.toggle("active", btn === activeBtn);
+      });
+    }
 
-// Podpięcie kliknięć i ustawienie aktywnego stylu
-chairBtn.onclick = () => {
-  showCategory("chairs");
-  setActiveButton(chairBtn);
-};
-materialsBtn.onclick = () => {
-  showCategory("materials");
-  setActiveButton(materialsBtn);
-};
+    chairBtn.onclick = () => {
+      showCategory("chairs");
+      setActiveButton(chairBtn);
+    };
 
-buttonsContainer.appendChild(chairBtn);
-buttonsContainer.appendChild(materialsBtn);
-ui.appendChild(buttonsContainer);
+    materialsBtn.onclick = () => {
+      showCategory("materials");
+      setActiveButton(materialsBtn);
+    };
 
-// Domyślnie aktywny pierwszy przycisk
-setActiveButton(chairBtn);
-
+    buttonsContainer.appendChild(chairBtn);
     buttonsContainer.appendChild(materialsBtn);
     ui.appendChild(buttonsContainer);
 
-    // Pobierz dane z arkusza
     const data = await loadSheetData();
 
-    // Podział na kategorie wg Grupa
     const chairs = data.filter(item => item.Grupa === "krzesło" || item.Grupa === "kubełek");
-    const materials = data.filter(item => item.Grupa === "tkanina" || item.Grupa === "drewno" || item.Grupa === "metal");
+    const materials = data.filter(item => ["tkanina", "drewno", "metal"].includes(item.Grupa));
 
     // Sekcja krzeseł
     const chairSection = document.createElement("div");
@@ -432,54 +469,59 @@ setActiveButton(chairBtn);
     const header1 = document.createElement("h3");
     header1.textContent = "Wybierz krzesło";
     chairSection.appendChild(header1);
-    chairs.forEach(item => {
-      const tile = createTile(item);
-      chairSection.appendChild(tile);
+
+    const chairGrid = document.createElement("div");
+    chairGrid.className = "grid-container";
+    chairs.forEach(chair => {
+      const tile = createTile(chair, "chairs");
+      chairGrid.appendChild(tile);
     });
+    chairSection.appendChild(chairGrid);
     ui.appendChild(chairSection);
 
     // Sekcja materiałów
-    const materialSection = document.createElement("div");
-    materialSection.id = "section-materials";
-    materialSection.style.display = "none";
+    const materialsSection = document.createElement("div");
+    materialsSection.id = "section-materials";
+    materialsSection.style.display = "none";
     const header2 = document.createElement("h3");
     header2.textContent = "Wybierz materiał";
-    materialSection.appendChild(header2);
+    materialsSection.appendChild(header2);
 
-    // Dodaj przyciski wyboru elementów krzesła z ikonami
-    initMaterialButtons(materialSection);
+    initMaterialButtons(materialsSection);
 
-    // Dodaj kafelki materiałów
-    materials.forEach(item => {
-      const tile = createTile(item);
-      materialSection.appendChild(tile);
+    const materialGrid = document.createElement("div");
+    materialGrid.className = "grid-container";
+    materials.forEach(material => {
+      const tile = createTile(material, "materials");
+      materialGrid.appendChild(tile);
     });
+    materialsSection.appendChild(materialGrid);
 
-    ui.appendChild(materialSection);
+    ui.appendChild(materialsSection);
 
-    // Załaduj domyślnie pierwszy model z krzeseł
-    if (chairs.length > 0) loadModel(chairs[0].Nazwa);
-  }
+    function showCategory(cat) {
+      if (cat === "chairs") {
+        chairSection.style.display = "";
+        materialsSection.style.display = "none";
+      } else {
+        chairSection.style.display = "none";
+        materialsSection.style.display = "";
+      }
+    }
 
-  function showCategory(name) {
-    document.getElementById("section-chairs").style.display = name === "chairs" ? "block" : "none";
-    document.getElementById("section-materials").style.display = name === "materials" ? "block" : "none";
+    showCategory("chairs");
+
+    // Auto-load first chair model
+    if (chairs.length > 0) {
+      loadModel(chairs[0].Nazwa);
+      const firstTile = chairGrid.querySelector(".tile");
+      setSelectedTile("chairs", firstTile);
+    }
   }
 
   initUI();
-
-  window.addEventListener("resize", () => {
-    camera.aspect = (window.innerWidth - 510) / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth - 510, window.innerHeight);
-  });
-
-  // Zablokuj scroll strony podczas zoomu modelu
-  document.addEventListener('wheel', function(e) {
-    e.preventDefault();
-  }, { passive: false });
-
 </script>
+
 
 
   </body>
