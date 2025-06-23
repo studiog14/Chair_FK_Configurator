@@ -228,7 +228,13 @@
     </div>
   </div>
 </div>
-<div id="ui"></div>
+<div id="ui">
+<div id="choose-legs-btn" style="display: none; margin: 10px 0;">
+  <button onclick="setActiveCategory('legs')">Wybierz nogi</button>
+</div>
+
+
+</div>
 
    <script type="module">
   import * as THREE from "three";
@@ -251,8 +257,9 @@
 
   const loader = new GLTFLoader();
   let currentModel;
-  let modelCenter = new THREE.Vector3(0, 0, 0);
   const loadingOverlay = document.getElementById("loadingOverlay");
+
+  let legButton = null;
 
   let targetCameraZ = camera.position.z = 5;
   const minCameraZ = 0.6;
@@ -314,7 +321,7 @@
           }
         }
       });
-      currentModel = null; // ważne - wyczyść referencję
+      currentModel = null;
     }
 
     loader.load(
@@ -363,10 +370,14 @@
     return data;
   }
 
+  // Referencja do głównych przycisków kategorii (utworzona w initUI)
+  let categoryButtons = null;
+
   function createTile(item, category) {
     const tile = document.createElement("div");
     tile.className = "tile";
     tile.setAttribute("data-nazwa", item.Nazwa);
+    tile.setAttribute("data-grupa", item.Grupa);
     tile.innerHTML = `
       <img src="${item.Obrazek}" alt="${item.Nazwa}" />
       <div class="tile-title">${item.Nazwa}</div>
@@ -376,18 +387,35 @@
     tile.addEventListener("click", () => {
       if (category === "chairs") {
         loadModel(item.Nazwa);
+
+        // Jeśli to kubełek, pokaż przycisk do nóg
+        if (item.Grupa === "kubełek") {
+          if (!legButton) {
+            legButton = document.createElement("button");
+            legButton.textContent = "➕ Wybierz nogi";
+            legButton.style.margin = "10px auto";
+            legButton.style.display = "block";
+            legButton.className = "leg-button";
+
+            legButton.onclick = () => {
+              showCategory("materials", "legs");
+            };
+
+            if (categoryButtons) {
+              categoryButtons.parentNode.insertBefore(legButton, categoryButtons.nextSibling);
+            }
+          } else {
+            legButton.style.display = "block";
+          }
+        } else {
+          if (legButton) legButton.style.display = "none";
+        }
+
       } else if (category === "materials") {
-        // Obsługa materiałów – dodaj tutaj jakąś logikę
         console.log("Wybrano materiał:", item.Nazwa);
       }
-      setSelectedTile(category, tile);
-    });
 
-    tile.addEventListener("mouseenter", () => {
-      tile.classList.add("hover");
-    });
-    tile.addEventListener("mouseleave", () => {
-      tile.classList.remove("hover");
+      setSelectedTile(category, tile);
     });
 
     return tile;
@@ -404,7 +432,7 @@
     });
   }
 
-  function initMaterialButtons(container) {
+  function initMaterialButtons() {
     const materialTypes = [
       { id: "seat", label: "Siedzisko", iconSrc: "icons/m_seat_icon.png" },
       { id: "legs", label: "Nogi", iconSrc: "icons/m_legs_icon.png" },
@@ -414,14 +442,15 @@
 
     const btnGroup = document.createElement("div");
     btnGroup.style.display = "flex";
+    btnGroup.style.flexWrap = "wrap";
     btnGroup.style.gap = "8px";
-    btnGroup.style.marginBottom = "10px";
+    btnGroup.style.margin = "10px 0";
 
     materialTypes.forEach((mat) => {
       const btn = document.createElement("button");
       btn.className = "material-part-button";
       btn.title = mat.label;
-      btn.style.flex = "1";
+      btn.style.flex = "1 1 100px";
       btn.style.padding = "6px";
       btn.style.display = "flex";
       btn.style.flexDirection = "column";
@@ -437,7 +466,6 @@
       `;
 
       btn.addEventListener("click", () => {
-        // Podświetlenie przycisku materiału
         [...btnGroup.children].forEach(sib => sib.classList.remove("selected"));
         btn.classList.add("selected");
         console.log("Wybrano element:", mat.id);
@@ -446,7 +474,7 @@
       btnGroup.appendChild(btn);
     });
 
-    container.appendChild(btnGroup);
+    return btnGroup;
   }
 
   async function initUI() {
@@ -492,6 +520,9 @@
     buttonsContainer.appendChild(materialsBtn);
     ui.appendChild(buttonsContainer);
 
+    // Przypisz referencję globalną, by legButton wiedział gdzie wstawić
+    categoryButtons = buttonsContainer;
+
     const data = await loadSheetData();
 
     const chairs = data.filter(item => item.Grupa === "krzesło" || item.Grupa === "kubełek");
@@ -521,7 +552,8 @@
     header2.textContent = "Wybierz materiał";
     materialsSection.appendChild(header2);
 
-    initMaterialButtons(materialsSection);
+    const materialButtonPanel = initMaterialButtons();
+    materialsSection.appendChild(materialButtonPanel);
 
     const materialGrid = document.createElement("div");
     materialGrid.className = "grid-container";
@@ -530,31 +562,41 @@
       materialGrid.appendChild(tile);
     });
     materialsSection.appendChild(materialGrid);
-
     ui.appendChild(materialsSection);
 
-    function showCategory(cat) {
-      if (cat === "chairs") {
-        chairSection.style.display = "";
-        materialsSection.style.display = "none";
-      } else {
-        chairSection.style.display = "none";
-        materialsSection.style.display = "";
-      }
-    }
-
     showCategory("chairs");
+  }
 
-    // Auto-load first chair model
-    if (chairs.length > 0) {
-      loadModel(chairs[0].Nazwa);
-      const firstTile = chairGrid.querySelector(".tile");
-      setSelectedTile("chairs", firstTile);
+  // Pokaż wybraną kategorię i ewentualny filtr
+  function showCategory(category, subFilter = null) {
+    const chairSection = document.getElementById("section-chairs");
+    const materialsSection = document.getElementById("section-materials");
+
+    if (category === "chairs") {
+      chairSection.style.display = "block";
+      materialsSection.style.display = "none";
+
+      if (legButton) legButton.style.display = "none";
+    } else if (category === "materials") {
+      chairSection.style.display = "none";
+      materialsSection.style.display = "block";
+
+      // Filtr podkategorii w materiałach
+      const tiles = materialsSection.querySelectorAll(".tile");
+      tiles.forEach(tile => {
+        const grupa = tile.getAttribute("data-grupa")?.toLowerCase() || "";
+        let show = true;
+        if (subFilter === "legs") {
+          show = ["metal", "drewno"].includes(grupa);
+        }
+        tile.style.display = show ? "" : "none";
+      });
     }
   }
 
   initUI();
 </script>
+
 
 
 
