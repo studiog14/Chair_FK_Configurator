@@ -4,6 +4,7 @@
     <meta charset="UTF-8" />
     <title>Konfigurator krzeseł</title>
     <style>
+
       button {
   background: none;
   border: none;
@@ -287,52 +288,53 @@
   });
 
   function loadModel(name) {
-  const path = `chairs/${name}.glb`;
-  loadingOverlay.style.display = "flex";
+    const path = `chairs/${name}.glb`;
+    loadingOverlay.style.display = "flex";
 
-  if (currentModel) {
-    scene.remove(currentModel);
-    currentModel.traverse((child) => {
-      if (child.geometry) child.geometry.dispose();
-      if (child.material) {
-        if (Array.isArray(child.material)) {
-          child.material.forEach((mat) => mat.dispose());
-        } else {
-          child.material.dispose();
+    if (currentModel) {
+      scene.remove(currentModel);
+      currentModel.traverse((child) => {
+        if (child.geometry) child.geometry.dispose();
+        if (child.material) {
+          if (Array.isArray(child.material)) {
+            child.material.forEach((mat) => mat.dispose());
+          } else {
+            child.material.dispose();
+          }
         }
-      }
-    });
-    currentModel = null; // ważne - wyczyść referencję
-  }
-
-  loader.load(
-    path,
-    (gltf) => {
-      currentModel = gltf.scene;
-      scene.add(currentModel);
-
-      const box = new THREE.Box3().setFromObject(currentModel);
-      const center = box.getCenter(new THREE.Vector3());
-      currentModel.position.sub(center);
-
-      const sizeVec = box.getSize(new THREE.Vector3());
-      const size = sizeVec.length();
-
-      camera.position.set(0, size * 0.2, size * 1.2);
-      targetCameraZ = camera.position.z;
-      camera.lookAt(0, 0, 0);
-
-      loadingOverlay.style.display = "none";
-    },
-    undefined,
-    (error) => {
-      console.error("❌ Błąd ładowania modelu:", error);
-      loadingOverlay.innerHTML = "❌ Błąd ładowania modelu";
-      loadingOverlay.style.display = "flex";
+      });
+      currentModel = null; // ważne - wyczyść referencję
     }
-  );
-}
 
+    loader.load(
+      path,
+      (gltf) => {
+        currentModel = gltf.scene;
+        scene.add(currentModel);
+
+        // Center model
+        const box = new THREE.Box3().setFromObject(currentModel);
+        const center = box.getCenter(new THREE.Vector3());
+        currentModel.position.sub(center);
+
+        // Size & positioning camera
+        const sizeVec = box.getSize(new THREE.Vector3());
+        const size = sizeVec.length();
+
+        camera.position.set(0, size * 0.2, size * 1.2);
+        targetCameraZ = camera.position.z;
+        camera.lookAt(0, 0, 0);
+
+        loadingOverlay.style.display = "none";
+      },
+      undefined,
+      (error) => {
+        console.error("❌ Błąd ładowania modelu:", error);
+        loadingOverlay.innerHTML = "❌ Błąd ładowania modelu";
+        loadingOverlay.style.display = "flex";
+      }
+    );
+  }
 
   function animate() {
     requestAnimationFrame(animate);
@@ -419,10 +421,9 @@
       btn.style.cursor = "pointer";
 
       btn.innerHTML = `
-  <img src="${mat.iconSrc}" alt="${mat.label}" style="width:60px; height:auto; margin-bottom:6px;" />
-  <span style="font-size: 12px;">${mat.label}</span>
-`;
-
+        <img src="${mat.iconSrc}" alt="${mat.label}" style="width:60px; height:auto; margin-bottom:6px;" />
+        <span style="font-size: 12px;">${mat.label}</span>
+      `;
 
       btn.addEventListener("click", () => {
         // Podświetlenie przycisku materiału
@@ -543,6 +544,7 @@
 
   initUI();
 </script>
+
 
 
 
