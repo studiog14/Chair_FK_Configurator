@@ -190,7 +190,7 @@
       function animate() {
         requestAnimationFrame(animate);
         camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
-        if (currentModel) camera.lookAt(modelCenter);
+        if (currentModel) camera.lookAt(0, 0, 0);
         if (currentModel && !controls.userIsInteracting) currentModel.rotation.y += 0.0005;
         renderer.render(scene, camera);
       }
