@@ -293,6 +293,49 @@ html, body {
     return tile;
   }
 
+  // Nowa funkcja tworząca przyciski ikon materiałów
+  function initMaterialButtons() {
+    const materialSection = document.getElementById("section-materials");
+    if (!materialSection) return;
+
+    const buttonsContainer = document.createElement("div");
+    buttonsContainer.id = "materialButtons";
+    buttonsContainer.style.display = "flex";
+    buttonsContainer.style.justifyContent = "space-around";
+    buttonsContainer.style.marginTop = "15px";
+    buttonsContainer.style.marginBottom = "20px";
+
+    const materialTypes = [
+      { id: "seat", label: "Siedzisko", iconSrc: "icons/seat.png" },
+      { id: "legs", label: "Nogi", iconSrc: "icons/legs.png" },
+      { id: "back_inner", label: "Oparcie wewnętrzne", iconSrc: "icons/back_inner.png" },
+      { id: "back_outer", label: "Oparcie zewnętrzne", iconSrc: "icons/back_outer.png" },
+    ];
+
+    materialTypes.forEach(({ id, label, iconSrc }) => {
+      const btn = document.createElement("button");
+      btn.className = "material-button";
+      btn.id = `material-btn-${id}`;
+      btn.title = label;
+
+      btn.style.border = "none";
+      btn.style.background = "transparent";
+      btn.style.cursor = "pointer";
+
+      btn.innerHTML = `<img src="${iconSrc}" alt="${label}" style="width: 40px; height: 40px;">`;
+
+      btn.addEventListener("click", () => {
+        console.log(`Wybrano materiał: ${label}`);
+        // Tutaj możesz dodać logikę wyboru materiału dla danego elementu krzesła
+      });
+
+      buttonsContainer.appendChild(btn);
+    });
+
+    // Wstawiamy przyciski na górę sekcji materiałów, pod nagłówkiem
+    materialSection.insertBefore(buttonsContainer, materialSection.children[1]);
+  }
+
   async function initUI() {
     const ui = document.getElementById("ui");
 
@@ -348,6 +391,9 @@ html, body {
     });
     ui.appendChild(materialSection);
 
+    // Dodajemy przyciski podziału materiałów na elementy
+    initMaterialButtons();
+
     // Załaduj domyślnie pierwszy model z krzeseł
     if (chairs.length > 0) loadModel(chairs[0].Nazwa);
   }
@@ -371,6 +417,7 @@ html, body {
   }, { passive: false });
 
 </script>
+
 
   </body>
 </html>
