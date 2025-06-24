@@ -257,9 +257,10 @@
 
   const loader = new GLTFLoader();
   let currentModel;
+  let modelCenter = new THREE.Vector3(0, 0, 0);
   const loadingOverlay = document.getElementById("loadingOverlay");
 
-  let legButton = null;
+  let legButton = null; // przycisk "Wybierz nogi"
 
   let targetCameraZ = camera.position.z = 5;
   const minCameraZ = 0.6;
@@ -370,14 +371,10 @@
     return data;
   }
 
-  // Referencja do głównych przycisków kategorii (utworzona w initUI)
-  let categoryButtons = null;
-
   function createTile(item, category) {
     const tile = document.createElement("div");
     tile.className = "tile";
     tile.setAttribute("data-nazwa", item.Nazwa);
-    tile.setAttribute("data-grupa", item.Grupa);
     tile.innerHTML = `
       <img src="${item.Obrazek}" alt="${item.Nazwa}" />
       <div class="tile-title">${item.Nazwa}</div>
@@ -393,19 +390,18 @@
           if (!legButton) {
             legButton = document.createElement("button");
             legButton.textContent = "➕ Wybierz nogi";
-            legButton.style.margin = "10px auto";
-            legButton.style.display = "block";
+            legButton.style.margin = "0 10px";
             legButton.className = "leg-button";
+            legButton.style.cursor = "pointer";
 
             legButton.onclick = () => {
-              showCategory("materials", "legs");
+              showCategory("materials", "legs"); // pokaż tylko nogi
             };
 
-            if (categoryButtons) {
-              categoryButtons.parentNode.insertBefore(legButton, categoryButtons.nextSibling);
-            }
+            // Wstaw przycisk pomiędzy dwoma przyciskami kategorii
+            categoryButtons.parentNode.insertBefore(legButton, categoryButtons.nextSibling);
           } else {
-            legButton.style.display = "block";
+            legButton.style.display = "inline-block";
           }
         } else {
           if (legButton) legButton.style.display = "none";
@@ -477,6 +473,8 @@
     return btnGroup;
   }
 
+  let categoryButtons = null; // tu zapiszemy div z dwoma przyciskami kategorii
+
   async function initUI() {
     const ui = document.getElementById("ui");
 
@@ -509,19 +507,20 @@
     chairBtn.onclick = () => {
       showCategory("chairs");
       setActiveButton(chairBtn);
+      if (legButton) legButton.style.display = "none"; // ukryj nogi przy powrocie do krzeseł
     };
 
     materialsBtn.onclick = () => {
       showCategory("materials");
       setActiveButton(materialsBtn);
+      if (legButton) legButton.style.display = "none"; // ukryj nogi przy przejściu do materiałów bez wyboru kubełka
     };
 
     buttonsContainer.appendChild(chairBtn);
     buttonsContainer.appendChild(materialsBtn);
     ui.appendChild(buttonsContainer);
 
-    // Przypisz referencję globalną, by legButton wiedział gdzie wstawić
-    categoryButtons = buttonsContainer;
+    categoryButtons = buttonsContainer; // zapisujemy kontener do późniejszego wstawiania przycisku nóg
 
     const data = await loadSheetData();
 
@@ -536,62 +535,66 @@
     chairSection.appendChild(header1);
 
     const chairGrid = document.createElement("div");
-    chairGrid.className = "grid-container";
+    chairGrid.className = "tile-container";
     chairs.forEach(chair => {
-      const tile = createTile(chair, "chairs");
-      chairGrid.appendChild(tile);
+      chairGrid.appendChild(createTile(chair, "chairs"));
     });
     chairSection.appendChild(chairGrid);
-    ui.appendChild(chairSection);
 
     // Sekcja materiałów
-    const materialsSection = document.createElement("div");
-    materialsSection.id = "section-materials";
-    materialsSection.style.display = "none";
+    const materialSection = document.createElement("div");
+    materialSection.id = "section-materials";
+    materialSection.style.display = "none";
     const header2 = document.createElement("h3");
     header2.textContent = "Wybierz materiał";
-    materialsSection.appendChild(header2);
-
-    const materialButtonPanel = initMaterialButtons();
-    materialsSection.appendChild(materialButtonPanel);
+    materialSection.appendChild(header2);
 
     const materialGrid = document.createElement("div");
-    materialGrid.className = "grid-container";
-    materials.forEach(material => {
-      const tile = createTile(material, "materials");
-      materialGrid.appendChild(tile);
+    materialGrid.className = "tile-container";
+    materials.forEach(mat => {
+      materialGrid.appendChild(createTile(mat, "materials"));
     });
-    materialsSection.appendChild(materialGrid);
-    ui.appendChild(materialsSection);
+    materialSection.appendChild(materialGrid);
 
-    showCategory("chairs");
-  }
+    // Dodaj sekcje do UI
+    ui.appendChild(chairSection);
+    ui.appendChild(materialSection);
 
-  // Pokaż wybraną kategorię i ewentualny filtr
-  function showCategory(category, subFilter = null) {
-    const chairSection = document.getElementById("section-chairs");
-    const materialsSection = document.getElementById("section-materials");
+    // Dodaj przyciski części materiałów (np. nogi, siedzisko)
+    const materialPartButtons = initMaterialButtons();
+    materialPartButtons.style.display = "none"; // domyślnie ukryte
+    ui.appendChild(materialPartButtons);
 
-    if (category === "chairs") {
-      chairSection.style.display = "block";
-      materialsSection.style.display = "none";
+    // Funkcja do pokazywania kategorii z filtracją materiałów
+    window.showCategory = (category, filterGroup) => {
+      if (category === "chairs") {
+        chairSection.style.display = "block";
+        materialSection.style.display = "none";
+        materialPartButtons.style.display = "none";
+      } else if (category === "materials") {
+        chairSection.style.display = "none";
+        materialSection.style.display = "block";
 
-      if (legButton) legButton.style.display = "none";
-    } else if (category === "materials") {
-      chairSection.style.display = "none";
-      materialsSection.style.display = "block";
-
-      // Filtr podkategorii w materiałach
-      const tiles = materialsSection.querySelectorAll(".tile");
-      tiles.forEach(tile => {
-        const grupa = tile.getAttribute("data-grupa")?.toLowerCase() || "";
-        let show = true;
-        if (subFilter === "legs") {
-          show = ["metal", "drewno"].includes(grupa);
+        if (filterGroup === "legs") {
+          // Pokaż tylko kafelki nóg
+          Array.from(materialGrid.children).forEach(tile => {
+            tile.style.display = tile.getAttribute("data-nazwa").toLowerCase().includes("nogi") ? "block" : "none";
+          });
+          materialPartButtons.style.display = "block";
+          // Ustaw domyślnie zaznaczenie na nogi
+          [...materialPartButtons.children].forEach(btn => btn.classList.remove("selected"));
+          materialPartButtons.children[1].classList.add("selected"); // przyjmujemy, że nogi to drugi przycisk
+        } else {
+          Array.from(materialGrid.children).forEach(tile => {
+            tile.style.display = "block";
+          });
+          materialPartButtons.style.display = "none";
         }
-        tile.style.display = show ? "" : "none";
-      });
-    }
+      }
+    };
+
+    // Start UI
+    showCategory("chairs");
   }
 
   initUI();
