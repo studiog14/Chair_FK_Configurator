@@ -56,7 +56,7 @@
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.physicallyCorrectLights = true;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 0.6; // mniej jasne
+    renderer.toneMappingExposure = 0.6;
 
     viewer.appendChild(renderer.domElement);
 
@@ -76,9 +76,10 @@
 
     const rgbeLoader = new RGBELoader();
     rgbeLoader.setPath('hdr/');
-    rgbeLoader.load('studio_small_03_1k.hdr', (texture) => {
+    rgbeLoader.load('bloem_hill_02_1k.hdr', (texture) => {
       texture.mapping = THREE.EquirectangularReflectionMapping;
       scene.environment = texture;
+      // scene.background = texture; // odkomentuj, jeśli chcesz mieć HDRI też jako tło
     });
 
     function loadModel(name) {
