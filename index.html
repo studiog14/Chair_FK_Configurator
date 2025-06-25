@@ -76,26 +76,50 @@
     import * as THREE from 'three';
     import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
     import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    import { RGBELoader } from 'three/addons/loaders/RGBELoader.js';
 
     const viewer = document.getElementById('viewer');
     const sidebar = document.getElementById('sidebar');
 
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color('#f0f0f0');
 
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({ antialias: true, physicallyCorrectLights: true });
+    renderer.setClearColor(0xf0f0f0);
+    renderer.outputEncoding = THREE.sRGBEncoding;
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    renderer.toneMappingExposure = 1.0;
+
     viewer.appendChild(renderer.domElement);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-    scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    // Usuwamy AmbientLight lub bardzo słabe
+    // const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
+    // scene.add(ambientLight);
+
+    // DirectionalLight nadal można mieć, ale na mniejszą moc
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
 
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
+
+    const pmremGenerator = new THREE.PMREMGenerator(renderer);
+    pmremGenerator.compileEquirectangularShader();
+
+    // Ładujemy HDRI i ustawiamy je jako environment oraz tło sceny
+    new RGBELoader()
+      .setPath('hdr/')
+      .load('studio_small_08_2k.hdr', (texture) => {
+        const envMap = pmremGenerator.fromEquirectangular(texture).texture;
+        scene.environment = envMap;        // środowisko do odbić i oświetlenia PBR
+        scene.background = envMap;         // ustawiamy HDRI jako tło
+        texture.dispose();
+        pmremGenerator.dispose();
+      }, undefined, (err) => {
+        console.warn('Nie udało się załadować HDRI:', err);
+      });
 
     let currentModel = null;
     const loader = new GLTFLoader();
@@ -109,6 +133,7 @@
           currentModel = gltf.scene;
           scene.add(currentModel);
 
+          // Przesuwamy model do środka i na ziemię
           const box = new THREE.Box3().setFromObject(currentModel);
           const size = new THREE.Vector3();
           const center = new THREE.Vector3();
@@ -119,14 +144,14 @@
           currentModel.position.z -= center.z;
           currentModel.position.y -= box.min.y;
 
+          // Kamerę ustawiamy tak, by dobrze widzieć model
           const marginFactor = 1.8;
           const maxDim = Math.max(size.x, size.y, size.z) * marginFactor;
 
           const fov = THREE.MathUtils.degToRad(camera.fov);
           const cameraDistance = maxDim / (2 * Math.tan(fov / 2));
 
-          // Tu jest zmiana — odbicie lustrzane kąta poziomego
-          const angleY = THREE.MathUtils.degToRad(-30); // minus dla odbicia
+          const angleY = THREE.MathUtils.degToRad(-30);
           const angleX = THREE.MathUtils.degToRad(25);
 
           const camX = cameraDistance * Math.sin(angleY) * Math.cos(angleX);
@@ -135,7 +160,6 @@
 
           camera.position.set(camX, camY, camZ);
 
-          // Kamera patrzy na środek modelu + wysokość połowy modelu
           controls.target.set(0, size.y * 0.5, 0);
           controls.update();
         },
@@ -179,7 +203,8 @@
           img.alt = chair.Nazwa;
 
           const label = document.createElement('span');
-          label.textContent = `${chair.Nazwa}\n(${chair.Grupa})`;
+          const cena = chair.Cena ? chair.Cena.trim() : 'brak ceny';
+          label.textContent = `${chair.Nazwa}\nCena ${cena}`;
 
           tile.appendChild(img);
           tile.appendChild(label);
