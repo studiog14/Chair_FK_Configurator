@@ -1,180 +1,200 @@
 <!DOCTYPE html>
 <html lang="en">
-  <head>
-    <meta charset="utf-8" />
-    <title>Chair Configurator</title>
-    <style>
-      * {
-        box-sizing: border-box;
+<head>
+  <meta charset="utf-8" />
+  <title>Chair Configurator</title>
+  <style>
+    * {
+      box-sizing: border-box;
+    }
+    body {
+      margin: 0;
+      font-family: sans-serif;
+      display: flex;
+      height: 100vh;
+      overflow: hidden;
+    }
+    #viewer {
+      flex: 1;
+      background: #f0f0f0;
+    }
+    #sidebar {
+      width: 510px;
+      background: white;
+      overflow-y: auto;
+      padding: 10px;
+      display: flex;
+      flex-wrap: wrap;
+      align-content: flex-start;
+      align-items: flex-start;
+      gap: 10px;
+    }
+    .chair-tile {
+      width: 120px;
+      height: 140px;
+      border: 1px solid #ddd;
+      border-radius: 10px;
+      overflow: hidden;
+      cursor: pointer;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: space-between;
+      padding: 5px;
+      background: #fafafa;
+      transition: transform 0.2s;
+    }
+    .chair-tile:hover {
+      transform: scale(1.05);
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+    .chair-tile img {
+      max-width: 100%;
+      max-height: 80px;
+      object-fit: contain;
+    }
+    .chair-tile span {
+      font-size: 12px;
+      text-align: center;
+      white-space: pre-line;
+    }
+  </style>
+  <script type="importmap">
+    {
+      "imports": {
+        "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
+        "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
       }
-      body {
-        margin: 0;
-        font-family: sans-serif;
-        display: flex;
-        height: 100vh;
-        overflow: hidden;
-      }
-      #viewer {
-        flex: 1;
-        background: #f0f0f0;
-      }
-      #sidebar {
-        width: 510px;
-        background: white;
-        overflow-y: auto;
-        padding: 10px;
-        display: flex;
-        flex-wrap: wrap;
-        align-content: flex-start;
-        align-items: flex-start;
-        gap: 10px;
-      }
-      .chair-tile {
-        width: 120px;
-        height: 140px;
-        border: 1px solid #ddd;
-        border-radius: 10px;
-        overflow: hidden;
-        cursor: pointer;
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: space-between;
-        padding: 5px;
-        background: #fafafa;
-        transition: transform 0.2s;
-      }
-      .chair-tile:hover {
-        transform: scale(1.05);
-        box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
-      }
-      .chair-tile img {
-        max-width: 100%;
-        max-height: 80px;
-        object-fit: contain;
-      }
-      .chair-tile span {
-        font-size: 12px;
-        text-align: center;
-      }
-    </style>
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.160.1/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.1/examples/jsm/"
+    }
+  </script>
+</head>
+<body>
+  <div id="viewer"></div>
+  <div id="sidebar"></div>
+
+  <script type="module">
+    import * as THREE from 'three';
+    import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+    import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+    const viewer = document.getElementById('viewer');
+    const sidebar = document.getElementById('sidebar');
+
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#f0f0f0');
+
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    viewer.appendChild(renderer.domElement);
+
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    const controls = new OrbitControls(camera, renderer.domElement);
+    controls.enableDamping = true;
+    controls.dampingFactor = 0.1;
+
+    let currentModel = null;
+    const loader = new GLTFLoader();
+
+    function loadModel(name) {
+      const modelPath = `chairs/${name}.glb`;
+      loader.load(
+        modelPath,
+        (gltf) => {
+          if (currentModel) scene.remove(currentModel);
+          currentModel = gltf.scene;
+          scene.add(currentModel);
+
+          const box = new THREE.Box3().setFromObject(currentModel);
+          const size = new THREE.Vector3();
+          const center = new THREE.Vector3();
+          box.getSize(size);
+          box.getCenter(center);
+
+          currentModel.position.x -= center.x;
+          currentModel.position.z -= center.z;
+          currentModel.position.y -= box.min.y;
+
+          const marginFactor = 1.8;
+          const maxDim = Math.max(size.x, size.y, size.z) * marginFactor;
+
+          const fov = THREE.MathUtils.degToRad(camera.fov);
+          const cameraDistance = maxDim / (2 * Math.tan(fov / 2));
+
+          // Tu jest zmiana — odbicie lustrzane kąta poziomego
+          const angleY = THREE.MathUtils.degToRad(-30); // minus dla odbicia
+          const angleX = THREE.MathUtils.degToRad(25);
+
+          const camX = cameraDistance * Math.sin(angleY) * Math.cos(angleX);
+          const camZ = cameraDistance * Math.cos(angleY) * Math.cos(angleX);
+          const camY = cameraDistance * Math.sin(angleX);
+
+          camera.position.set(camX, camY, camZ);
+
+          // Kamera patrzy na środek modelu + wysokość połowy modelu
+          controls.target.set(0, size.y * 0.5, 0);
+          controls.update();
+        },
+        undefined,
+        (error) => {
+          console.error('Błąd ładowania modelu:', error);
         }
-      }
-    </script>
-  </head>
-  <body>
-    <div id="viewer"></div>
-    <div id="sidebar"></div>
+      );
+    }
 
-    <script type="module">
-      import * as THREE from 'three';
-      import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-      import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+    function resizeRendererToViewer() {
+      const rect = viewer.getBoundingClientRect();
+      renderer.setSize(rect.width, rect.height);
+      camera.aspect = rect.width / rect.height;
+      camera.updateProjectionMatrix();
+    }
 
-      const viewer = document.getElementById('viewer');
-      const sidebar = document.getElementById('sidebar');
+    window.addEventListener('load', resizeRendererToViewer);
+    window.addEventListener('resize', resizeRendererToViewer);
 
-      const scene = new THREE.Scene();
-      scene.background = new THREE.Color('#f0f0f0');
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
+    animate();
 
-      const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-      const renderer = new THREE.WebGLRenderer({ antialias: true });
-      viewer.appendChild(renderer.domElement);
-
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.9);
-      scene.add(ambientLight);
-      const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
-      directionalLight.position.set(5, 10, 7.5);
-      scene.add(directionalLight);
-
-      const controls = new OrbitControls(camera, renderer.domElement);
-
-      let currentModel = null;
-      const loader = new GLTFLoader();
-
-      function loadModel(name) {
-        const modelPath = `chairs/${name}.glb`;
-        loader.load(
-          modelPath,
-          (gltf) => {
-            if (currentModel) scene.remove(currentModel);
-            currentModel = gltf.scene;
-            scene.add(currentModel);
-
-            const box = new THREE.Box3().setFromObject(currentModel);
-            const size = new THREE.Vector3();
-            const center = new THREE.Vector3();
-            box.getSize(size);
-            box.getCenter(center);
-
-            currentModel.position.sub(center);
-            const maxDim = Math.max(size.x, size.y, size.z);
-            const fitHeightDistance = maxDim / (2 * Math.tan((Math.PI * camera.fov) / 360));
-            const fitWidthDistance = fitHeightDistance / camera.aspect;
-            const distance = Math.max(fitHeightDistance, fitWidthDistance);
-
-            camera.position.set(0, size.y * 0.5, distance * 1.3);
-            controls.target.set(0, size.y * 0.5, 0);
-            controls.update();
-          },
-          undefined,
-          (error) => {
-            console.error('Błąd ładowania modelu:', error);
-          }
+    fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane')
+      .then((res) => res.json())
+      .then((data) => {
+        const chairs = data.filter(
+          (item) => item.Grupa === 'krzesło' || item.Grupa === 'kubełek'
         );
-      }
+        chairs.forEach((chair) => {
+          const tile = document.createElement('div');
+          tile.className = 'chair-tile';
+          tile.title = chair.Nazwa;
 
-      function resizeRendererToViewer() {
-        const rect = viewer.getBoundingClientRect();
-        renderer.setSize(rect.width, rect.height);
-        camera.aspect = rect.width / rect.height;
-        camera.updateProjectionMatrix();
-      }
+          const img = document.createElement('img');
+          img.src = chair.Obrazek || '';
+          img.alt = chair.Nazwa;
 
-      window.addEventListener('load', resizeRendererToViewer);
-      window.addEventListener('resize', resizeRendererToViewer);
+          const label = document.createElement('span');
+          label.textContent = `${chair.Nazwa}\n(${chair.Grupa})`;
 
-      function animate() {
-        requestAnimationFrame(animate);
-        renderer.render(scene, camera);
-      }
-      animate();
+          tile.appendChild(img);
+          tile.appendChild(label);
 
-      fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane')
-        .then((res) => res.json())
-        .then((data) => {
-          const chairs = data.filter((item) => item.Grupa === 'krzesło' || item.Grupa === 'kubełek');
-          chairs.forEach((chair) => {
-            const tile = document.createElement('div');
-            tile.className = 'chair-tile';
-            tile.title = chair.Nazwa;
-
-            const img = document.createElement('img');
-            img.src = chair.Obrazek || '';
-            img.alt = chair.Nazwa;
-
-            const label = document.createElement('span');
-            label.textContent = `${chair.Nazwa}\n(${chair.Grupa})`;
-
-            tile.appendChild(img);
-            tile.appendChild(label);
-
-            tile.addEventListener('click', () => loadModel(chair.Nazwa));
-            sidebar.appendChild(tile);
-          });
-
-          if (chairs.length > 0) {
-            loadModel(chairs[0].Nazwa);
-          }
-        })
-        .catch((err) => {
-          console.error('Błąd pobierania arkusza:', err);
+          tile.addEventListener('click', () => loadModel(chair.Nazwa));
+          sidebar.appendChild(tile);
         });
-    </script>
-  </body>
+
+        if (chairs.length > 0) {
+          loadModel(chairs[0].Nazwa);
+        }
+      })
+      .catch((err) => {
+        console.error('Błąd pobierania arkusza:', err);
+      });
+  </script>
+</body>
 </html>
