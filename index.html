@@ -4,7 +4,6 @@
   <meta charset="utf-8" />
   <title>Chair Configurator</title>
   <style>
-    /* ... Stylizacja bez zmian ... */
     * {
       box-sizing: border-box;
     }
@@ -82,45 +81,45 @@
     const viewer = document.getElementById('viewer');
     const sidebar = document.getElementById('sidebar');
 
-    const scene = new THREE.Scene();
-
-    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
-    const renderer = new THREE.WebGLRenderer({ antialias: true, physicallyCorrectLights: true });
-    renderer.setClearColor(0xf0f0f0);
+    // Renderer z antyaliasingiem i gamma correction
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
     renderer.outputEncoding = THREE.sRGBEncoding;
-    renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 2.0; // podbijamy jasność HDRI
-
+    renderer.toneMapping = THREE.ACESFilmicToneMapping;  // profesjonalne tonowanie
+    renderer.toneMappingExposure = 1.0;                  // można regulować jasność tutaj
     viewer.appendChild(renderer.domElement);
 
-    // Dodajemy słabe ambient light, żeby nie było zbyt ciemno
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
-    scene.add(ambientLight);
+    // Scena i kamera
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color('#f0f0f0');
 
-    // Directional light trochę jaśniejszy
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
-    directionalLight.position.set(5, 10, 7.5);
-    scene.add(directionalLight);
+    const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 1000);
 
+    // Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
 
+    // Światło - lekka ambientowa poświata i kierunkowe bez cieni
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+    scene.add(ambientLight);
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
+    directionalLight.position.set(5, 10, 7.5);
+    scene.add(directionalLight);
+
+    // HDRI loader + PMREMGenerator
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
     new RGBELoader()
-      .setPath('hdr/')
-      .load('studio_small_08_2k.hdr', (texture) => {
+      .setPath('hdr/')  // folder z Twoim .hdr
+      .load('studio_small_03_1k.hdr', function (texture) { // nazwa Twojego pliku hdr
         const envMap = pmremGenerator.fromEquirectangular(texture).texture;
         scene.environment = envMap;
-        scene.background = envMap;
         texture.dispose();
         pmremGenerator.dispose();
-      }, undefined, (err) => {
-        console.warn('Nie udało się załadować HDRI:', err);
       });
 
+    // Model loader
     let currentModel = null;
     const loader = new GLTFLoader();
 
@@ -133,6 +132,7 @@
           currentModel = gltf.scene;
           scene.add(currentModel);
 
+          // Reset pozycja modelu do środka sceny
           const box = new THREE.Box3().setFromObject(currentModel);
           const size = new THREE.Vector3();
           const center = new THREE.Vector3();
@@ -143,6 +143,7 @@
           currentModel.position.z -= center.z;
           currentModel.position.y -= box.min.y;
 
+          // Kamerka ustawiona pod model
           const marginFactor = 1.8;
           const maxDim = Math.max(size.x, size.y, size.z) * marginFactor;
 
@@ -157,7 +158,6 @@
           const camY = cameraDistance * Math.sin(angleX);
 
           camera.position.set(camX, camY, camZ);
-
           controls.target.set(0, size.y * 0.5, 0);
           controls.update();
         },
@@ -168,16 +168,17 @@
       );
     }
 
+    // Resize renderer
     function resizeRendererToViewer() {
       const rect = viewer.getBoundingClientRect();
       renderer.setSize(rect.width, rect.height);
       camera.aspect = rect.width / rect.height;
       camera.updateProjectionMatrix();
     }
-
     window.addEventListener('load', resizeRendererToViewer);
     window.addEventListener('resize', resizeRendererToViewer);
 
+    // Animate loop
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
@@ -185,6 +186,7 @@
     }
     animate();
 
+    // Pobierz dane z Google Sheets i stwórz kafelki
     fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane')
       .then((res) => res.json())
       .then((data) => {
@@ -201,8 +203,7 @@
           img.alt = chair.Nazwa;
 
           const label = document.createElement('span');
-          const cena = chair.Cena ? chair.Cena.trim() : 'brak ceny';
-          label.textContent = `${chair.Nazwa}\nCena: ${cena}`;
+          label.textContent = `${chair.Nazwa}\nCena: ${chair.Cena}`;
 
           tile.appendChild(img);
           tile.appendChild(label);
