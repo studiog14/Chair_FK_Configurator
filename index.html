@@ -1,608 +1,120 @@
 <!DOCTYPE html>
-<html lang="pl">
-  <head>
-    <meta charset="UTF-8" />
-    <title>Konfigurator krzeseł</title>
-    <style>
-
-      button {
-  background: none;
-  border: none;
-  padding: 0;
-  margin: 0;
-  font: inherit;
-  color: inherit;
-  box-sizing: border-box;
-  cursor: pointer;
-}
-
-
-  body {
-    margin: 0;
-    font-family: sans-serif;
-    display: flex;
-    height: 100vh;
-    overflow: hidden;
-  }
-
-  #viewer {
-    flex: 1;
-    background-color: #f9f9f9;
-    position: relative;
-  }
-
-  #ui {
-    width: 510px;
-    background-color: #fff;
-    overflow-y: auto;
-    padding: 20px;
-    border-left: 1px solid #ddd;
-  }
-
-  #loadingOverlay {
-    position: absolute;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(255, 255, 255, 0.85);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1;
-    pointer-events: auto;
-  }
-
-  #loadingContent {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
-    text-align: center;
-  }
-
-  #loadingLogo {
-    width: 250px;
-    height: auto;
-    opacity: 0.9;
-  }
-
-  #loadingIcon {
-    width: 50px;
-    height: 50px;
-    animation: spin 1.2s linear infinite;
-    opacity: 0.8;
-  }
-
-  #loadingText {
-    font-size: 1.2em;
-    color: #333;
-    opacity: 0.8;
-  }
-
-  @keyframes spin {
-    from { transform: rotate(0deg); }
-    to { transform: rotate(360deg); }
-  }
-
-  #loadingOverlay .spinner {
-    border: 5px solid #f3f3f3;
-    border-top: 5px solid #5c5c5c;
-    border-radius: 50%;
-    width: 50px;
-    height: 50px;
-    animation: spin 1s linear infinite;
-    margin-bottom: 15px;
-  }
-
-  .tile {
-    width: 100px;
-    margin: 6px;
-    display: inline-block;
-    cursor: pointer;
-    border: 2px solid transparent;
-    transition: border-color 0.3s, box-shadow 0.3s;
-    padding: 4px;
-    border-radius: 6px;
-    user-select: none;
-    background-color: #fff;
-    text-align: center;
-  }
-
-  .tile img {
-    width: 100%;
-    height: auto;
-    border-radius: 4px;
-    box-shadow: 0 0 3px rgba(0,0,0,0.1);
-    object-fit: contain;
-  }
-
-  .tile div {
-    font-size: 0.75em;
-    margin-top: 4px;
-    color: #333;
-  }
-
-  .tile-price {
-    font-size: 0.7em;
-    color: #666;
-    margin-top: 2px;
-  }
-
-  .tile.hover {
-    border-color: #888;
-    box-shadow: 0 0 6px rgba(0,0,0,0.15);
-  }
-
-  .tile.selected {
-    border-color: #2e2e2e;
-    box-shadow: 0 0 10px #313131;
-    background-color: #e7f1ff;
-  }
-
-  .tile:hover {
-    background-color: rgba(0, 120, 215, 0.08);
-    border-color: #6b6b6b;
-  }
-
-  .tile:focus {
-    outline: none;
-    border-color: #555555;
-    background-color: rgba(85, 85, 85, 0.15);
-  }
-
-  h3 {
-    margin-top: 0;
-  }
-
-  html, body {
-    overflow: hidden;
-    height: 100%;
-  }
-
-  .main-category-btn {
-  width: 100px;
-  height: 100px;
-  margin: 6px;
-  padding: 8px 6px;
-  font-size: 0.9em;
-  line-height: 1.2em;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  text-align: center;
-  background-color: #fff;
-  border: 2px solid transparent;
-  border-radius: 6px;
-  transition: background-color 0.25s ease, border-color 0.25s ease;
-  cursor: pointer;
-  user-select: none;
-  box-shadow: 0 0 3px rgba(0,0,0,0.05);
-  white-space: normal;
-  word-wrap: break-word;
-}
-
-.main-category-btn img {
-  max-width: 60%;
-  max-height: 60%;
-  object-fit: contain;
-  display: block;
-  margin-bottom: 6px;
-}
-
-.main-category-btn:hover {
-  background-color: rgba(0, 120, 215, 0.08);
-  border-color: #6b6b6b;
-}
-
-.main-category-btn:focus {
-  outline: none;
-  border-color: #555555;
-  background-color: rgba(85, 85, 85, 0.15);
-}
-
-.main-category-btn.active {
-  border-color: #2e2e2e;
-  background-color: rgba(102, 102, 102, 0.15);
-}
-
-    </style>
-
-    <script type="importmap">
-      {
-        "imports": {
-          "three": "https://cdn.jsdelivr.net/npm/three@0.152.2/build/three.module.js",
-          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.152.2/examples/jsm/"
-        }
-      }
-    </script>
-  </head>
-  <body>
-    <div id="viewer">
-  <div id="loadingOverlay">
-    <div id="loadingContent">
-      <img id="loadingLogo" src="icons/FK_Logo.jpg" alt="Logo" />
-      <img id="loadingIcon" src="icons/CircleLoad.png" alt="Loading..." />
-      <div id="loadingText">Loading...</div>
-    </div>
-  </div>
-</div>
-<div id="ui">
-<div id="choose-legs-btn" style="display: none; margin: 10px 0;">
-  <button onclick="setActiveCategory('legs')">Wybierz nogi</button>
-</div>
-
-
-</div>
-
-   <script type="module">
-  import * as THREE from "three";
-  import { GLTFLoader } from "three/addons/loaders/GLTFLoader.js";
-
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(45, (window.innerWidth - 510) / window.innerHeight, 0.1, 100);
-  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
-  renderer.setSize(window.innerWidth - 510, window.innerHeight);
-  renderer.shadowMap.enabled = false;
-  document.getElementById("viewer").appendChild(renderer.domElement);
-
-  const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-  scene.add(ambientLight);
-
-  const directionalLight = new THREE.DirectionalLight(0xffffff, 0.85);
-  directionalLight.position.set(5, 10, 7);
-  directionalLight.castShadow = false;
-  scene.add(directionalLight);
-
-  const loader = new GLTFLoader();
-  let currentModel;
-  let modelCenter = new THREE.Vector3(0, 0, 0);
-  const loadingOverlay = document.getElementById("loadingOverlay");
-
-  let legButton = null; // przycisk "Wybierz nogi"
-
-  let targetCameraZ = camera.position.z = 5;
-  const minCameraZ = 0.6;
-  const maxCameraZ = 1.8;
-  const zoomSpeed = 0.001;
-  const zoomLerpFactor = 0.1;
-
-  const controls = { userIsInteracting: false };
-  let previousMouseX = 0;
-  let previousMouseY = 0;
-
-  function onMouseDown(event) {
-    controls.userIsInteracting = true;
-    previousMouseX = event.clientX;
-    previousMouseY = event.clientY;
-  }
-
-  function onMouseMove(event) {
-    if (controls.userIsInteracting && currentModel) {
-      const deltaX = event.clientX - previousMouseX;
-      const deltaY = event.clientY - previousMouseY;
-
-      currentModel.rotation.y += deltaX * 0.005;
-      currentModel.rotation.x += deltaY * 0.003;
-      currentModel.rotation.x = Math.min(Math.max(currentModel.rotation.x, -Math.PI / 4), Math.PI / 4);
-
-      previousMouseX = event.clientX;
-      previousMouseY = event.clientY;
-    }
-  }
-
-  function onMouseUp() {
-    controls.userIsInteracting = false;
-  }
-
-  window.addEventListener("mousedown", onMouseDown);
-  window.addEventListener("mousemove", onMouseMove);
-  window.addEventListener("mouseup", onMouseUp);
-
-  window.addEventListener("wheel", (event) => {
-    if (!currentModel) return;
-    targetCameraZ += event.deltaY * zoomSpeed;
-    targetCameraZ = Math.min(Math.max(targetCameraZ, minCameraZ), maxCameraZ);
-  });
-
-  function loadModel(name) {
-    const path = `chairs/${name}.glb`;
-    loadingOverlay.style.display = "flex";
-
-    if (currentModel) {
-      scene.remove(currentModel);
-      currentModel.traverse((child) => {
-        if (child.geometry) child.geometry.dispose();
-        if (child.material) {
-          if (Array.isArray(child.material)) {
-            child.material.forEach((mat) => mat.dispose());
-          } else {
-            child.material.dispose();
-          }
-        }
-      });
-      currentModel = null;
-    }
-
-    loader.load(
-      path,
-      (gltf) => {
-        currentModel = gltf.scene;
-        scene.add(currentModel);
-
-        // Center model
-        const box = new THREE.Box3().setFromObject(currentModel);
-        const center = box.getCenter(new THREE.Vector3());
-        currentModel.position.sub(center);
-
-        // Size & positioning camera
-        const sizeVec = box.getSize(new THREE.Vector3());
-        const size = sizeVec.length();
-
-        camera.position.set(0, size * 0.2, size * 1.2);
-        targetCameraZ = camera.position.z;
-        camera.lookAt(0, 0, 0);
-
-        loadingOverlay.style.display = "none";
-      },
-      undefined,
-      (error) => {
-        console.error("❌ Błąd ładowania modelu:", error);
-        loadingOverlay.innerHTML = "❌ Błąd ładowania modelu";
-        loadingOverlay.style.display = "flex";
-      }
-    );
-  }
-
-  function animate() {
-    requestAnimationFrame(animate);
-    camera.position.z += (targetCameraZ - camera.position.z) * zoomLerpFactor;
-    if (currentModel) camera.lookAt(0, 0, 0);
-    if (currentModel && !controls.userIsInteracting) currentModel.rotation.y += 0.0005;
-    renderer.render(scene, camera);
-  }
-
-  animate();
-
-  async function loadSheetData() {
-    const res = await fetch("https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane");
-    const data = await res.json();
-    return data;
-  }
-
-  function createTile(item, category) {
-    const tile = document.createElement("div");
-    tile.className = "tile";
-    tile.setAttribute("data-nazwa", item.Nazwa);
-    tile.innerHTML = `
-      <img src="${item.Obrazek}" alt="${item.Nazwa}" />
-      <div class="tile-title">${item.Nazwa}</div>
-      <div class="tile-price">${item.Cena ? item.Cena + ' zł' : ''}</div>
-    `;
-
-    tile.addEventListener("click", () => {
-      if (category === "chairs") {
-        loadModel(item.Nazwa);
-
-        // Jeśli to kubełek, pokaż przycisk do nóg
-        if (item.Grupa === "kubełek") {
-          if (!legButton) {
-            legButton = document.createElement("button");
-            legButton.textContent = "➕ Wybierz nogi";
-            legButton.style.margin = "0 10px";
-            legButton.className = "leg-button";
-            legButton.style.cursor = "pointer";
-
-            legButton.onclick = () => {
-              showCategory("materials", "legs"); // pokaż tylko nogi
-            };
-
-            // Wstaw przycisk pomiędzy dwoma przyciskami kategorii
-            categoryButtons.parentNode.insertBefore(legButton, categoryButtons.nextSibling);
-          } else {
-            legButton.style.display = "inline-block";
-          }
-        } else {
-          if (legButton) legButton.style.display = "none";
-        }
-
-      } else if (category === "materials") {
-        console.log("Wybrano materiał:", item.Nazwa);
-      }
-
-      setSelectedTile(category, tile);
-    });
-
-    return tile;
-  }
-
-  function setSelectedTile(category, selectedTile) {
-    const containerId = category === "chairs" ? "section-chairs" : "section-materials";
-    const container = document.getElementById(containerId);
-    if (!container) return;
-
-    const tiles = container.querySelectorAll(".tile");
-    tiles.forEach(tile => {
-      tile.classList.toggle("selected", tile === selectedTile);
-    });
-  }
-
-  function initMaterialButtons() {
-    const materialTypes = [
-      { id: "seat", label: "Siedzisko", iconSrc: "icons/m_seat_icon.png" },
-      { id: "legs", label: "Nogi", iconSrc: "icons/m_legs_icon.png" },
-      { id: "back_inner", label: "Oparcie wewnętrzne", iconSrc: "icons/m_backseat_in_icon.png" },
-      { id: "back_outer", label: "Oparcie zewnętrzne", iconSrc: "icons/m_backseat_out_icon.png" },
-    ];
-
-    const btnGroup = document.createElement("div");
-    btnGroup.style.display = "flex";
-    btnGroup.style.flexWrap = "wrap";
-    btnGroup.style.gap = "8px";
-    btnGroup.style.margin = "10px 0";
-
-    materialTypes.forEach((mat) => {
-      const btn = document.createElement("button");
-      btn.className = "material-part-button";
-      btn.title = mat.label;
-      btn.style.flex = "1 1 100px";
-      btn.style.padding = "6px";
-      btn.style.display = "flex";
-      btn.style.flexDirection = "column";
-      btn.style.alignItems = "center";
-      btn.style.border = "1px solid #ccc";
-      btn.style.borderRadius = "4px";
-      btn.style.background = "#fff";
-      btn.style.cursor = "pointer";
-
-      btn.innerHTML = `
-        <img src="${mat.iconSrc}" alt="${mat.label}" style="width:60px; height:auto; margin-bottom:6px;" />
-        <span style="font-size: 12px;">${mat.label}</span>
-      `;
-
-      btn.addEventListener("click", () => {
-        [...btnGroup.children].forEach(sib => sib.classList.remove("selected"));
-        btn.classList.add("selected");
-        console.log("Wybrano element:", mat.id);
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>3D Viewer</title>
+  <style>
+    body { margin: 0; overflow: hidden; }
+    canvas { display: block; }
+  </style>
+</head>
+<body>
+  <script type="module">
+    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
+    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
+    import { RGBELoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/RGBELoader.js';
+    import { OrbitControls } from 'https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js';
+
+    let scene, camera, renderer, controls;
+
+    init();
+
+    function init() {
+      scene = new THREE.Scene();
+
+      // Kamera
+      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+      camera.position.set(0, 1.5, 3);
+
+      // Renderer
+      renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      renderer.setPixelRatio(window.devicePixelRatio);
+      renderer.outputColorSpace = THREE.SRGBColorSpace;
+      renderer.toneMapping = THREE.ACESFilmicToneMapping;
+      renderer.toneMappingExposure = 1;
+      document.body.appendChild(renderer.domElement);
+
+      // HDRI oświetlenie środowiskowe
+      new RGBELoader()
+        .setPath('hdr/')
+        .load('studio_small_08_2k.hdr', function (texture) {
+          texture.mapping = THREE.EquirectangularReflectionMapping;
+          scene.environment = texture;
+          scene.background = texture;
+
+          // Załaduj model dopiero po załadowaniu środowiska
+          loadModelFromSheet();
+        });
+
+      // Światło dodatkowe
+      const dirLight = new THREE.DirectionalLight(0xffffff, 2);
+      dirLight.position.set(3, 10, 10);
+      dirLight.castShadow = true;
+      scene.add(dirLight);
+
+      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+      scene.add(ambientLight);
+
+      // Kontroler kamery
+      controls = new OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+
+      // Skalowanie okna
+      window.addEventListener('resize', () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
       });
 
-      btnGroup.appendChild(btn);
-    });
-
-    return btnGroup;
-  }
-
-  let categoryButtons = null; // tu zapiszemy div z dwoma przyciskami kategorii
-
-  async function initUI() {
-    const ui = document.getElementById("ui");
-
-    const buttonsContainer = document.createElement("div");
-    buttonsContainer.style.display = "flex";
-    buttonsContainer.style.gap = "15px";
-    buttonsContainer.style.marginBottom = "20px";
-    buttonsContainer.style.justifyContent = "center";
-
-    const chairBtn = document.createElement("button");
-    chairBtn.className = "main-category-btn active";
-    chairBtn.innerHTML = `
-      <img src="icons/chair_icon.png" alt="Krzesła" />
-      <span>Krzesła</span>
-    `;
-
-    const materialsBtn = document.createElement("button");
-    materialsBtn.className = "main-category-btn";
-    materialsBtn.innerHTML = `
-      <img src="icons/fabric_icon.png" alt="Materiały" />
-      <span>Materiały</span>
-    `;
-
-    function setActiveButton(activeBtn) {
-      [chairBtn, materialsBtn].forEach(btn => {
-        btn.classList.toggle("active", btn === activeBtn);
-      });
+      animate();
     }
 
-    chairBtn.onclick = () => {
-      showCategory("chairs");
-      setActiveButton(chairBtn);
-      if (legButton) legButton.style.display = "none"; // ukryj nogi przy powrocie do krzeseł
-    };
+    function animate() {
+      requestAnimationFrame(animate);
+      controls.update();
+      renderer.render(scene, camera);
+    }
 
-    materialsBtn.onclick = () => {
-      showCategory("materials");
-      setActiveButton(materialsBtn);
-      if (legButton) legButton.style.display = "none"; // ukryj nogi przy przejściu do materiałów bez wyboru kubełka
-    };
-
-    buttonsContainer.appendChild(chairBtn);
-    buttonsContainer.appendChild(materialsBtn);
-    ui.appendChild(buttonsContainer);
-
-    categoryButtons = buttonsContainer; // zapisujemy kontener do późniejszego wstawiania przycisku nóg
-
-    const data = await loadSheetData();
-
-    const chairs = data.filter(item => item.Grupa === "krzesło" || item.Grupa === "kubełek");
-    const materials = data.filter(item => ["tkanina", "drewno", "metal"].includes(item.Grupa));
-
-    // Sekcja krzeseł
-    const chairSection = document.createElement("div");
-    chairSection.id = "section-chairs";
-    const header1 = document.createElement("h3");
-    header1.textContent = "Wybierz krzesło";
-    chairSection.appendChild(header1);
-
-    const chairGrid = document.createElement("div");
-    chairGrid.className = "tile-container";
-    chairs.forEach(chair => {
-      chairGrid.appendChild(createTile(chair, "chairs"));
-    });
-    chairSection.appendChild(chairGrid);
-
-    // Sekcja materiałów
-    const materialSection = document.createElement("div");
-    materialSection.id = "section-materials";
-    materialSection.style.display = "none";
-    const header2 = document.createElement("h3");
-    header2.textContent = "Wybierz materiał";
-    materialSection.appendChild(header2);
-
-    const materialGrid = document.createElement("div");
-    materialGrid.className = "tile-container";
-    materials.forEach(mat => {
-      materialGrid.appendChild(createTile(mat, "materials"));
-    });
-    materialSection.appendChild(materialGrid);
-
-    // Dodaj sekcje do UI
-    ui.appendChild(chairSection);
-    ui.appendChild(materialSection);
-
-    // Dodaj przyciski części materiałów (np. nogi, siedzisko)
-    const materialPartButtons = initMaterialButtons();
-    materialPartButtons.style.display = "none"; // domyślnie ukryte
-    ui.appendChild(materialPartButtons);
-
-    // Funkcja do pokazywania kategorii z filtracją materiałów
-    window.showCategory = (category, filterGroup) => {
-      if (category === "chairs") {
-        chairSection.style.display = "block";
-        materialSection.style.display = "none";
-        materialPartButtons.style.display = "none";
-      } else if (category === "materials") {
-        chairSection.style.display = "none";
-        materialSection.style.display = "block";
-
-        if (filterGroup === "legs") {
-          // Pokaż tylko kafelki nóg
-          Array.from(materialGrid.children).forEach(tile => {
-            tile.style.display = tile.getAttribute("data-nazwa").toLowerCase().includes("nogi") ? "block" : "none";
+    function loadModel(name) {
+      const loader = new GLTFLoader();
+      loader.load(
+        `chairs/${name}.glb`,
+        function (gltf) {
+          const model = gltf.scene;
+          model.traverse(child => {
+            if (child.isMesh) {
+              child.castShadow = true;
+              child.receiveShadow = true;
+            }
           });
-          materialPartButtons.style.display = "block";
-          // Ustaw domyślnie zaznaczenie na nogi
-          [...materialPartButtons.children].forEach(btn => btn.classList.remove("selected"));
-          materialPartButtons.children[1].classList.add("selected"); // przyjmujemy, że nogi to drugi przycisk
-        } else {
-          Array.from(materialGrid.children).forEach(tile => {
-            tile.style.display = "block";
-          });
-          materialPartButtons.style.display = "none";
+          model.scale.set(1, 1, 1);
+          model.position.set(0, 0, 0);
+          scene.add(model);
+          console.log('Model załadowany:', name);
+        },
+        undefined,
+        function (error) {
+          console.error('Błąd ładowania modelu:', error);
         }
+      );
+    }
+
+    async function loadModelFromSheet() {
+      try {
+        const res = await fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Arkusz1');
+        const data = await res.json();
+
+        if (data && data.length > 0) {
+          const firstModelName = data[0].Nazwa; // Zakładam, że kolumna "Nazwa" zawiera np. FK-12
+          loadModel(firstModelName);
+        } else {
+          console.error('Arkusz jest pusty lub nieczytelny.');
+        }
+      } catch (err) {
+        console.error('Błąd ładowania arkusza Google:', err);
       }
-    };
-
-    // Start UI
-    showCategory("chairs");
-  }
-
-  initUI();
-</script>
-
-
-
-
-
-  </body>
+    }
+  </script>
+</body>
 </html>
