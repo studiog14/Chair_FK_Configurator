@@ -2,23 +2,32 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Chair Viewer Debug</title>
+  <title>3D Chair Viewer - Debug Mode</title>
   <style>
     body { margin: 0; overflow: hidden; background: #222; }
     canvas { display: block; }
+    #log { position: fixed; top: 0; left: 0; width: 100%; max-height: 150px; overflow-y: auto; background: rgba(0,0,0,0.7); color: #fff; font-family: monospace; font-size: 12px; padding: 5px; z-index: 1000; }
   </style>
 </head>
 <body>
+  <div id="log">Log:<br></div>
   <script type="module">
     import * as THREE from 'https://cdn.skypack.dev/three@0.150.1';
     import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls.js';
     import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
 
+    const logEl = document.getElementById('log');
+    function log(msg) {
+      console.log(msg);
+      logEl.innerHTML += msg + '<br>';
+      logEl.scrollTop = logEl.scrollHeight;
+    }
+
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x222222);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-    camera.position.set(2, 2, 4);
+    camera.position.set(1.5, 1.5, 3);
 
     const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -29,14 +38,12 @@
     controls.target.set(0, 0.7, 0);
     controls.update();
 
-    // Helpery - siatka i osie
     const gridHelper = new THREE.GridHelper(10, 10);
     scene.add(gridHelper);
 
     const axesHelper = new THREE.AxesHelper(1);
     scene.add(axesHelper);
 
-    // Oświetlenie
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
@@ -46,57 +53,113 @@
 
     const loader = new GLTFLoader();
 
+    function loadModel(url) {
+      log(`Ładowanie modelu: ${url}`);
+      loader.load(
+        url,
+        gltf => {
+          log(`Model załadowany: ${url}`);
+
+          // Przed dodaniem usuń poprzednie modele (opcjonalnie)
+          while(scene.children.length > 0){
+            scene.remove(scene.children[0]);
+          }
+          // Dodaj helpery z powrotem
+          scene.add(gridHelper);
+          scene.add(axesHelper);
+          scene.add(ambientLight);
+          scene.add(directionalLight);
+
+          const model = gltf.scene;
+          model.scale.set(1, 1, 1);
+          model.position.set(0, 0, 0);
+          scene.add(model);
+
+          // Ustaw kamerę na model (jeśli można)
+          // Tu można rozbudować o BoundingBox, ale na razie prosto
+          camera.position.set(1.5, 1.5, 3);
+          controls.target.set(0, 0.7, 0);
+          controls.update();
+        },
+        xhr => {
+          if (xhr.lengthComputable) {
+            const percent = ((xhr.loaded / xhr.total) * 100).toFixed(2);
+            log(`Postęp ładowania modelu: ${percent}%`);
+          }
+        },
+        error => {
+          log(`Błąd ładowania modelu: ${error.message}`);
+        }
+      );
+    }
+
+    // Załaduj model z arkusza
     function loadFirstModelFromSheet() {
       const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+      log('Pobieranie danych z arkusza: ' + sheetURL);
 
-      console.log('Pobieranie danych z arkusza:', sheetURL);
       fetch(sheetURL)
         .then(res => res.json())
         .then(data => {
-          console.log('Dane z arkusza:', data);
+          log('Dane z arkusza pobrane: ' + data.length + ' rekordów');
           if (!data || data.length === 0) {
-            console.error('Brak danych w arkuszu!');
+            log('Brak danych w arkuszu!');
+            loadFallbackModel();
             return;
           }
 
           const firstChair = data[0];
-          console.log('Pierwszy wiersz z arkusza:', firstChair);
+          log('Pierwszy wiersz: ' + JSON.stringify(firstChair));
 
           if (!firstChair.Nazwa) {
-            console.error('Pole "Nazwa" jest puste lub nie istnieje!');
+            log('Pole "Nazwa" jest puste!');
+            loadFallbackModel();
             return;
           }
 
           let modelName = firstChair.Nazwa.trim();
+
           if (!modelName.toLowerCase().endsWith('.glb')) {
             modelName += '.glb';
           }
-          const modelPath = `chairs/${modelName}`;
-          console.log('Próba ładowania modelu:', modelPath);
 
-          loader.load(
-            modelPath,
-            gltf => {
-              console.log('Model załadowany:', modelName);
-              const model = gltf.scene;
-              model.scale.set(1, 1, 1);
-              model.position.set(0, 0, 0);
-              scene.add(model);
-              controls.update();
-            },
-            xhr => {
-              if (xhr.lengthComputable) {
-                console.log('Ładowanie modelu:', ((xhr.loaded / xhr.total) * 100).toFixed(2) + '%');
-              }
-            },
-            error => {
-              console.error('Błąd ładowania modelu:', error);
-            }
-          );
+          const modelPath = `chairs/${modelName}`;
+          loadModel(modelPath);
         })
         .catch(err => {
-          console.error('Błąd pobierania danych z arkusza:', err);
+          log('Błąd pobierania arkusza: ' + err.message);
+          loadFallbackModel();
         });
+    }
+
+    function loadFallbackModel() {
+      // Publiczny model testowy (łatwo dostępny), jeśli twój się nie załaduje
+      const testModel = 'https://threejs.org/examples/models/gltf/DamagedHelmet/glTF/DamagedHelmet.gltf';
+      log('Ładowanie modelu zapasowego (publiczny testowy model Three.js)');
+      loader.load(
+        testModel,
+        gltf => {
+          log('Model zapasowy załadowany.');
+          // Usuwamy poprzednie
+          while(scene.children.length > 0){
+            scene.remove(scene.children[0]);
+          }
+          scene.add(gridHelper);
+          scene.add(axesHelper);
+          scene.add(ambientLight);
+          scene.add(directionalLight);
+          const model = gltf.scene;
+          model.scale.set(2, 2, 2);
+          scene.add(model);
+          camera.position.set(3,3,6);
+          controls.target.set(0, 0, 0);
+          controls.update();
+        },
+        undefined,
+        error => {
+          log('Błąd ładowania modelu zapasowego: ' + error.message);
+        }
+      );
     }
 
     loadFirstModelFromSheet();
