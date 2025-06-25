@@ -18,7 +18,7 @@
     scene.background = new THREE.Color(0x222222);
 
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
-    camera.position.set(1.5, 1.5, 3);
+    camera.position.set(2, 2, 4);
 
     const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
@@ -29,7 +29,7 @@
     controls.target.set(0, 0.7, 0);
     controls.update();
 
-    // Dodajemy helpery - siatkę i osie do podglądu sceny
+    // Helpery - siatka i osie
     const gridHelper = new THREE.GridHelper(10, 10);
     scene.add(gridHelper);
 
@@ -62,13 +62,15 @@
           const firstChair = data[0];
           console.log('Pierwszy wiersz z arkusza:', firstChair);
 
-          // Sprawdź, czy pole Nazwa istnieje i jest niepuste
           if (!firstChair.Nazwa) {
             console.error('Pole "Nazwa" jest puste lub nie istnieje!');
             return;
           }
 
-          const modelName = firstChair.Nazwa;
+          let modelName = firstChair.Nazwa.trim();
+          if (!modelName.toLowerCase().endsWith('.glb')) {
+            modelName += '.glb';
+          }
           const modelPath = `chairs/${modelName}`;
           console.log('Próba ładowania modelu:', modelPath);
 
@@ -78,7 +80,9 @@
               console.log('Model załadowany:', modelName);
               const model = gltf.scene;
               model.scale.set(1, 1, 1);
+              model.position.set(0, 0, 0);
               scene.add(model);
+              controls.update();
             },
             xhr => {
               if (xhr.lengthComputable) {
