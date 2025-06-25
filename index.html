@@ -35,30 +35,39 @@
       z-index: 10;
       font-family: monospace;
     }
-    button {
-      margin: 5px 2px;
-      padding: 6px 12px;
-      cursor: pointer;
-    }
-    img.thumb {
-      width: 48px;
-      height: 48px;
-      object-fit: contain;
-      vertical-align: middle;
-      margin-right: 6px;
-      border: 1px solid #ccc;
-      border-radius: 3px;
+    #chairs-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
     }
     .item-button {
-      display: flex;
-      align-items: center;
-      margin-bottom: 6px;
-      border: 1px solid transparent;
-      border-radius: 4px;
+      width: 100px;
+      text-align: center;
+      padding: 5px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+      background-color: #f9f9f9;
+      transition: 0.2s;
+    }
+    .item-button:hover {
+      background-color: #eaeaea;
     }
     .item-button.selected {
       border-color: #0078d7;
-      background-color: #e0f0ff;
+      background-color: #dbeeff;
+    }
+    img.thumb {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      margin-bottom: 5px;
+      border-radius: 4px;
+      border: 1px solid #ccc;
+    }
+    .item-button span {
+      display: block;
+      font-size: 13px;
     }
   </style>
 
@@ -90,10 +99,8 @@
       console.log(msg);
     }
 
-    // Podstawowe zmienne
     const scene = new THREE.Scene();
 
-    // Kamera - FOV 45, near=0.1, far=2000
     const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 2000);
 
     const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -105,7 +112,6 @@
     controls.enableDamping = true;
     controls.dampingFactor = 0.1;
 
-    // Światło - jasne i miękkie, żeby model był dobrze widoczny
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
 
@@ -113,13 +119,10 @@
     directionalLight.position.set(10, 20, 10);
     scene.add(directionalLight);
 
-    // Loader
     const loader = new GLTFLoader();
 
-    // Zmienna na aktualny model
     let currentModel = null;
 
-    // Wyczyszczenie sceny z poprzedniego modelu
     function clearCurrentModel() {
       if (currentModel) {
         scene.remove(currentModel);
@@ -137,7 +140,6 @@
       }
     }
 
-    // Funkcja ładowania modelu, centrowanie i ustawienie kamery
     function loadModel(name) {
       clearCurrentModel();
 
@@ -149,35 +151,18 @@
         gltf => {
           currentModel = gltf.scene;
 
-          // Wycentruj model na (0,0,0)
           const box = new THREE.Box3().setFromObject(currentModel);
-          const center = new THREE.Vector3();
-          box.getCenter(center);
+          const sphere = box.getBoundingSphere(new THREE.Sphere());
 
-          currentModel.position.x += (currentModel.position.x - center.x);
-          currentModel.position.y += (currentModel.position.y - center.y);
-          currentModel.position.z += (currentModel.position.z - center.z);
-
+          // Centrowanie modelu
+          currentModel.position.sub(sphere.center);
           scene.add(currentModel);
 
-          // Oblicz rozmiary modelu
-          const size = box.getSize(new THREE.Vector3());
-          const maxDim = Math.max(size.x, size.y, size.z);
-
-          // Kamera stanie dalej, aby nic nie było ucięte
-          const fitDistance = maxDim * 2.5;
-
-          // Ustaw pozycję kamery względem środka modelu
-          camera.position.set(center.x, center.y + maxDim * 0.8, center.z + fitDistance);
-
-          // Kamera patrzy na środek modelu
-          controls.target.copy(center);
+          // Ustawienie kamery na wysokości środka modelu, z przodu
+          const distance = sphere.radius * 2.5;
+          camera.position.set(0, 0, distance);
+          controls.target.set(0, 0, 0);
           controls.update();
-
-          // Aktualizacja matriks projekcji kamery
-          camera.near = 0.1;
-          camera.far = 2000;
-          camera.updateProjectionMatrix();
 
           log(`Model ${name} załadowany.`);
         },
@@ -188,18 +173,14 @@
       );
     }
 
-    // Animacja renderowania
     function animate() {
       requestAnimationFrame(animate);
       controls.update();
       renderer.render(scene, camera);
     }
 
-    // Ładowanie danych z Google Sheets i budowanie UI
-
     const chairsListEl = document.getElementById("chairs-list");
 
-    // Link do opensheet.elk.sh z Twoim arkuszem i zakładką Dane
     const sheetURL = "https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane";
 
     async function loadSheet() {
@@ -207,7 +188,6 @@
         const response = await fetch(sheetURL);
         const data = await response.json();
 
-        // Filtrujemy tylko krzesła (Typ = 'Krzesło' lub Grupa = 'krzesło')
         const chairs = data.filter(item => {
           return item.Typ?.toLowerCase() === "krzesło" || item.Grupa?.toLowerCase() === "krzesło";
         });
@@ -215,12 +195,10 @@
         chairsListEl.innerHTML = "";
 
         chairs.forEach(chair => {
-          // Tworzymy przycisk z ikoną z kolumny Obrazek i nazwą
-          const btn = document.createElement("button");
+          const btn = document.createElement("div");
           btn.className = "item-button";
           btn.title = chair.Nazwa || "Bez nazwy";
 
-          // Miniaturka obrazka jeśli jest link w Obrazek
           if (chair.Obrazek && chair.Obrazek.startsWith("http")) {
             const img = document.createElement("img");
             img.src = chair.Obrazek;
@@ -234,10 +212,8 @@
           btn.appendChild(span);
 
           btn.onclick = () => {
-            // Oznacz wybrany przycisk
             document.querySelectorAll(".item-button").forEach(b => b.classList.remove("selected"));
             btn.classList.add("selected");
-            // Załaduj model
             if (chair.Nazwa) loadModel(chair.Nazwa);
           };
 
@@ -245,14 +221,13 @@
         });
 
         if (chairs.length > 0 && chairs[0].Nazwa) {
-          loadModel(chairs[0].Nazwa); // załaduj domyślnie pierwszy model
+          loadModel(chairs[0].Nazwa);
         }
       } catch (e) {
         log("Błąd pobierania arkusza: " + e.message);
       }
     }
 
-    // Obsługa zmian rozmiaru okna
     function onWindowResize() {
       renderer.setSize(window.innerWidth - 510, window.innerHeight);
       camera.aspect = (window.innerWidth - 510) / window.innerHeight;
@@ -260,7 +235,6 @@
     }
     window.addEventListener("resize", onWindowResize);
 
-    // Start
     loadSheet();
     animate();
 
