@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Chair Viewer - Load from Google Sheet</title>
+  <title>3D Chair Viewer Debug</title>
   <style>
     body { margin: 0; overflow: hidden; background: #222; }
     canvas { display: block; }
@@ -29,8 +29,15 @@
     controls.target.set(0, 0.7, 0);
     controls.update();
 
+    // Dodajemy helpery - siatkę i osie do podglądu sceny
+    const gridHelper = new THREE.GridHelper(10, 10);
+    scene.add(gridHelper);
+
+    const axesHelper = new THREE.AxesHelper(1);
+    scene.add(axesHelper);
+
     // Oświetlenie
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
     scene.add(ambientLight);
 
     const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
@@ -42,16 +49,24 @@
     function loadFirstModelFromSheet() {
       const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
 
+      console.log('Pobieranie danych z arkusza:', sheetURL);
       fetch(sheetURL)
         .then(res => res.json())
         .then(data => {
+          console.log('Dane z arkusza:', data);
           if (!data || data.length === 0) {
             console.error('Brak danych w arkuszu!');
             return;
           }
 
           const firstChair = data[0];
-          console.log('Pierwszy model z arkusza:', firstChair);
+          console.log('Pierwszy wiersz z arkusza:', firstChair);
+
+          // Sprawdź, czy pole Nazwa istnieje i jest niepuste
+          if (!firstChair.Nazwa) {
+            console.error('Pole "Nazwa" jest puste lub nie istnieje!');
+            return;
+          }
 
           const modelName = firstChair.Nazwa;
           const modelPath = `chairs/${modelName}`;
@@ -60,14 +75,14 @@
           loader.load(
             modelPath,
             gltf => {
+              console.log('Model załadowany:', modelName);
               const model = gltf.scene;
               model.scale.set(1, 1, 1);
               scene.add(model);
-              console.log('Model załadowany:', modelName);
             },
             xhr => {
               if (xhr.lengthComputable) {
-                console.log((xhr.loaded / xhr.total * 100).toFixed(2) + '% model załadowany');
+                console.log('Ładowanie modelu:', ((xhr.loaded / xhr.total) * 100).toFixed(2) + '%');
               }
             },
             error => {
@@ -76,7 +91,7 @@
           );
         })
         .catch(err => {
-          console.error('Błąd ładowania arkusza:', err);
+          console.error('Błąd pobierania danych z arkusza:', err);
         });
     }
 
