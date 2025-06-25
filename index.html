@@ -4,6 +4,7 @@
   <meta charset="utf-8" />
   <title>Chair Configurator</title>
   <style>
+    /* ... Stylizacja bez zmian ... */
     * {
       box-sizing: border-box;
     }
@@ -88,16 +89,16 @@
     renderer.setClearColor(0xf0f0f0);
     renderer.outputEncoding = THREE.sRGBEncoding;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.0;
+    renderer.toneMappingExposure = 2.0; // podbijamy jasność HDRI
 
     viewer.appendChild(renderer.domElement);
 
-    // Usuwamy AmbientLight lub bardzo słabe
-    // const ambientLight = new THREE.AmbientLight(0xffffff, 0.1);
-    // scene.add(ambientLight);
+    // Dodajemy słabe ambient light, żeby nie było zbyt ciemno
+    const ambientLight = new THREE.AmbientLight(0xffffff, 0.2);
+    scene.add(ambientLight);
 
-    // DirectionalLight nadal można mieć, ale na mniejszą moc
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.3);
+    // Directional light trochę jaśniejszy
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 0.5);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
 
@@ -108,13 +109,12 @@
     const pmremGenerator = new THREE.PMREMGenerator(renderer);
     pmremGenerator.compileEquirectangularShader();
 
-    // Ładujemy HDRI i ustawiamy je jako environment oraz tło sceny
     new RGBELoader()
       .setPath('hdr/')
       .load('studio_small_08_2k.hdr', (texture) => {
         const envMap = pmremGenerator.fromEquirectangular(texture).texture;
-        scene.environment = envMap;        // środowisko do odbić i oświetlenia PBR
-        scene.background = envMap;         // ustawiamy HDRI jako tło
+        scene.environment = envMap;
+        scene.background = envMap;
         texture.dispose();
         pmremGenerator.dispose();
       }, undefined, (err) => {
@@ -133,7 +133,6 @@
           currentModel = gltf.scene;
           scene.add(currentModel);
 
-          // Przesuwamy model do środka i na ziemię
           const box = new THREE.Box3().setFromObject(currentModel);
           const size = new THREE.Vector3();
           const center = new THREE.Vector3();
@@ -144,7 +143,6 @@
           currentModel.position.z -= center.z;
           currentModel.position.y -= box.min.y;
 
-          // Kamerę ustawiamy tak, by dobrze widzieć model
           const marginFactor = 1.8;
           const maxDim = Math.max(size.x, size.y, size.z) * marginFactor;
 
@@ -204,7 +202,7 @@
 
           const label = document.createElement('span');
           const cena = chair.Cena ? chair.Cena.trim() : 'brak ceny';
-          label.textContent = `${chair.Nazwa}\nCena ${cena}`;
+          label.textContent = `${chair.Nazwa}\nCena: ${cena}`;
 
           tile.appendChild(img);
           tile.appendChild(label);
