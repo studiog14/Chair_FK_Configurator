@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Chair Viewer</title>
+  <title>3D Chair Viewer - Load from Google Sheet</title>
   <style>
     body { margin: 0; overflow: hidden; background: #222; }
     canvas { display: block; }
@@ -11,64 +11,63 @@
 <body>
   <script type="module">
     import * as THREE from 'https://cdn.skypack.dev/three@0.150.1';
-    import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls';
-    import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader';
+    import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls.js';
+    import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
 
-    // Scena, kamera, renderer
     const scene = new THREE.Scene();
-    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+    scene.background = new THREE.Color(0x222222);
+
+    const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
     camera.position.set(1.5, 1.5, 3);
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    const renderer = new THREE.WebGLRenderer({antialias: true});
     renderer.setSize(window.innerWidth, window.innerHeight);
     renderer.setPixelRatio(window.devicePixelRatio);
     document.body.appendChild(renderer.domElement);
 
-    // Orbit Controls
     const controls = new OrbitControls(camera, renderer.domElement);
     controls.target.set(0, 0.7, 0);
     controls.update();
 
-    // Światło
+    // Oświetlenie
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
     scene.add(ambientLight);
-    const directionalLight = new THREE.DirectionalLight(0xffffff, 1.0);
+
+    const directionalLight = new THREE.DirectionalLight(0xffffff, 1);
     directionalLight.position.set(5, 10, 7.5);
     scene.add(directionalLight);
 
-    // Loader GLTF
     const loader = new GLTFLoader();
 
-    function loadModelFromSheet() {
-      const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/krzesla';
+    function loadFirstModelFromSheet() {
+      const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
 
       fetch(sheetURL)
         .then(res => res.json())
         .then(data => {
-          if (data.length === 0) {
-            console.error('Brak danych w arkuszu.');
+          if (!data || data.length === 0) {
+            console.error('Brak danych w arkuszu!');
             return;
           }
 
-          const modelName = data[0].Nazwa; // np. "Fargo.glb"
-          // Uwaga: nazwa z arkusza może już zawierać ".glb", jeśli tak to usuń nadmiar
-          let fileName = modelName.toLowerCase().endsWith('.glb') ? modelName : modelName + '.glb';
+          const firstChair = data[0];
+          console.log('Pierwszy model z arkusza:', firstChair);
 
-          // Zamiana na poprawną ścieżkę na GitHub Pages
-          // Załóżmy, że folder chairs jest w katalogu głównym strony
-          const modelPath = `chairs/${fileName}`;
-          console.log('Ładowanie modelu:', modelPath);
+          const modelName = firstChair.Nazwa;
+          const modelPath = `chairs/${modelName}`;
+          console.log('Próba ładowania modelu:', modelPath);
 
           loader.load(
             modelPath,
             gltf => {
-              gltf.scene.scale.set(1, 1, 1);
-              scene.add(gltf.scene);
-              console.log('Model załadowany:', fileName);
+              const model = gltf.scene;
+              model.scale.set(1, 1, 1);
+              scene.add(model);
+              console.log('Model załadowany:', modelName);
             },
             xhr => {
               if (xhr.lengthComputable) {
-                console.log((xhr.loaded / xhr.total * 100).toFixed(2) + '% załadowane');
+                console.log((xhr.loaded / xhr.total * 100).toFixed(2) + '% model załadowany');
               }
             },
             error => {
@@ -77,20 +76,18 @@
           );
         })
         .catch(err => {
-          console.error('Błąd ładowania danych z arkusza:', err);
+          console.error('Błąd ładowania arkusza:', err);
         });
     }
 
-    loadModelFromSheet();
+    loadFirstModelFromSheet();
 
-    // Animacja i render
     function animate() {
       requestAnimationFrame(animate);
       renderer.render(scene, camera);
     }
     animate();
 
-    // Responsywność
     window.addEventListener('resize', () => {
       camera.aspect = window.innerWidth/window.innerHeight;
       camera.updateProjectionMatrix();
