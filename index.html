@@ -1,120 +1,63 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8" />
-  <title>3D Viewer</title>
-  <style>
-    body { margin: 0; overflow: hidden; }
-    canvas { display: block; }
-  </style>
+<meta charset="UTF-8" />
+<title>Test Model</title>
+<style>body { margin: 0; overflow: hidden; background: #111; }</style>
 </head>
 <body>
-  <script type="module">
-    import * as THREE from 'https://unpkg.com/three@0.161.0/build/three.module.js';
-    import { GLTFLoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/GLTFLoader.js';
-    import { RGBELoader } from 'https://unpkg.com/three@0.161.0/examples/jsm/loaders/RGBELoader.js';
-    import { OrbitControls } from 'https://unpkg.com/three@0.161.0/examples/jsm/controls/OrbitControls.js';
+<script type="module">
+  import * as THREE from 'https://cdn.skypack.dev/three@0.150.1';
+  import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls';
+  import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader';
 
-    let scene, camera, renderer, controls;
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x111111);
 
-    init();
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 1000);
+  camera.position.set(2,2,3);
 
-    function init() {
-      scene = new THREE.Scene();
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  document.body.appendChild(renderer.domElement);
 
-      // Kamera
-      camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-      camera.position.set(0, 1.5, 3);
+  const controls = new OrbitControls(camera, renderer.domElement);
+  controls.target.set(0,1,0);
+  controls.update();
 
-      // Renderer
-      renderer = new THREE.WebGLRenderer({ antialias: true });
-      renderer.setSize(window.innerWidth, window.innerHeight);
-      renderer.setPixelRatio(window.devicePixelRatio);
-      renderer.outputColorSpace = THREE.SRGBColorSpace;
-      renderer.toneMapping = THREE.ACESFilmicToneMapping;
-      renderer.toneMappingExposure = 1;
-      document.body.appendChild(renderer.domElement);
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
+  scene.add(ambientLight);
 
-      // HDRI oświetlenie środowiskowe
-      new RGBELoader()
-        .setPath('hdr/')
-        .load('studio_small_08_2k.hdr', function (texture) {
-          texture.mapping = THREE.EquirectangularReflectionMapping;
-          scene.environment = texture;
-          scene.background = texture;
+  const dirLight = new THREE.DirectionalLight(0xffffff, 1);
+  dirLight.position.set(5,10,5);
+  scene.add(dirLight);
 
-          // Załaduj model dopiero po załadowaniu środowiska
-          loadModelFromSheet();
-        });
+  const loader = new GLTFLoader();
 
-      // Światło dodatkowe
-      const dirLight = new THREE.DirectionalLight(0xffffff, 2);
-      dirLight.position.set(3, 10, 10);
-      dirLight.castShadow = true;
-      scene.add(dirLight);
+  loader.load(
+    './chairs/Fargo.glb', // dokładna ścieżka i nazwa z uwzględnieniem wielkości liter
+    gltf => {
+      const model = gltf.scene;
+      scene.add(model);
+      model.position.set(0,0,0);
+      model.scale.set(1,1,1);
+      console.log('Model załadowany');
+    },
+    xhr => console.log((xhr.loaded / xhr.total * 100).toFixed(2) + '% loaded'),
+    error => console.error('Błąd ładowania modelu:', error)
+  );
 
-      const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-      scene.add(ambientLight);
+  function animate() {
+    requestAnimationFrame(animate);
+    renderer.render(scene, camera);
+  }
+  animate();
 
-      // Kontroler kamery
-      controls = new OrbitControls(camera, renderer.domElement);
-      controls.enableDamping = true;
-
-      // Skalowanie okna
-      window.addEventListener('resize', () => {
-        camera.aspect = window.innerWidth / window.innerHeight;
-        camera.updateProjectionMatrix();
-        renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-
-      animate();
-    }
-
-    function animate() {
-      requestAnimationFrame(animate);
-      controls.update();
-      renderer.render(scene, camera);
-    }
-
-    function loadModel(name) {
-      const loader = new GLTFLoader();
-      loader.load(
-        `chairs/${name}.glb`,
-        function (gltf) {
-          const model = gltf.scene;
-          model.traverse(child => {
-            if (child.isMesh) {
-              child.castShadow = true;
-              child.receiveShadow = true;
-            }
-          });
-          model.scale.set(1, 1, 1);
-          model.position.set(0, 0, 0);
-          scene.add(model);
-          console.log('Model załadowany:', name);
-        },
-        undefined,
-        function (error) {
-          console.error('Błąd ładowania modelu:', error);
-        }
-      );
-    }
-
-    async function loadModelFromSheet() {
-      try {
-        const res = await fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Arkusz1');
-        const data = await res.json();
-
-        if (data && data.length > 0) {
-          const firstModelName = data[0].Nazwa; // Zakładam, że kolumna "Nazwa" zawiera np. FK-12
-          loadModel(firstModelName);
-        } else {
-          console.error('Arkusz jest pusty lub nieczytelny.');
-        }
-      } catch (err) {
-        console.error('Błąd ładowania arkusza Google:', err);
-      }
-    }
-  </script>
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+</script>
 </body>
 </html>
