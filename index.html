@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>3D Model Test</title>
+  <title>3D Model Viewer</title>
   <style>
     body { margin: 0; overflow: hidden; }
     canvas { display: block; }
@@ -17,10 +17,10 @@
   const scene = new THREE.Scene();
   scene.background = new THREE.Color(0xeeeeee);
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth/window.innerHeight, 0.1, 100);
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
   camera.position.set(0, 1.5, 3);
 
-  const renderer = new THREE.WebGLRenderer({antialias: true});
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
   document.body.appendChild(renderer.domElement);
 
@@ -28,11 +28,8 @@
   controls.target.set(0, 0.5, 0);
   controls.update();
 
-  const gridHelper = new THREE.GridHelper(10, 10);
-  scene.add(gridHelper);
-
-  const axesHelper = new THREE.AxesHelper(1);
-  scene.add(axesHelper);
+  scene.add(new THREE.GridHelper(10, 10));
+  scene.add(new THREE.AxesHelper(1));
 
   const ambientLight = new THREE.AmbientLight(0xffffff, 0.7);
   scene.add(ambientLight);
@@ -42,11 +39,10 @@
   scene.add(directionalLight);
 
   const loader = new GLTFLoader();
-
   loader.load(
-    'chairs/Fargo.glb',
+    './chairs/Fargo.glb',
     gltf => {
-      console.log('Model załadowany');
+      console.log('✅ Model załadowany');
       const model = gltf.scene;
       model.scale.set(2, 2, 2);
       model.position.set(0, 0, 0);
@@ -58,7 +54,7 @@
       }
     },
     error => {
-      console.error('Błąd ładowania modelu:', error);
+      console.error('❌ Błąd ładowania modelu:', error);
     }
   );
 
@@ -69,7 +65,7 @@
   animate();
 
   window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth/window.innerHeight;
+    camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
