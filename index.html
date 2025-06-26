@@ -34,14 +34,21 @@
       flex-direction: column;
       gap: 10px;
     }
-    .material-buttons {
+    .material-buttons, .variant-legs-buttons {
       display: flex; flex-wrap: wrap; gap: 5px;
     }
-    .material-buttons button {
+    .material-buttons button, .variant-legs-buttons button {
       padding: 5px 10px; border: 1px solid #aaa; border-radius: 5px; background: #eee; cursor: pointer;
     }
-    .material-buttons button:hover {
+    .material-buttons button:hover, .variant-legs-buttons button:hover {
       background: #ddd;
+    }
+    #variant-legs-section {
+      display: none;
+      flex-direction: column;
+      gap: 10px;
+      border-top: 1px solid #ccc;
+      padding-top: 10px;
     }
     #back-button {
       display: none;
@@ -75,6 +82,13 @@
         <button data-part="oparcie_wew">🛋 Oparcie wew.</button>
         <button data-part="oparcie_zew">🪞 Oparcie zew.</button>
       </div>
+
+      <!-- Sekcja wyboru wariantów nóg dla kubełków -->
+      <div id="variant-legs-section">
+        <h4>Warianty nóg:</h4>
+        <div id="variant-legs-buttons" class="variant-legs-buttons"></div>
+      </div>
+
       <div id="material-tiles" class="tile-grid"></div>
     </div>
   </div>
@@ -90,6 +104,8 @@
     const materialSection = document.getElementById('material-section');
     const materialTiles = document.getElementById('material-tiles');
     const backButton = document.getElementById('back-button');
+    const variantLegsSection = document.getElementById('variant-legs-section');
+    const variantLegsButtons = document.getElementById('variant-legs-buttons');
 
     const scene = new THREE.Scene();
     scene.background = new THREE.Color('#f0f0f0');
@@ -130,6 +146,9 @@
     });
 
     let currentModel = null;
+    let allMaterials = [];
+    let variantLegsMaterials = [];
+    let currentChair = null; // Obiekt aktualnie wybranego krzesła
 
     function loadModel(name) {
       const path = `chairs/${name}.glb`;
@@ -182,8 +201,10 @@
       const response = await fetch(url);
       const data = await response.json();
 
+      // Filtrowanie krzeseł i materiałów
       const chairs = data.filter(i => i.Grupa === 'krzesło' || i.Grupa === 'kubełek');
-      const materials = data.filter(i => ['tkanina', 'metal', 'drewno'].includes(i.Grupa));
+      allMaterials = data.filter(i => ['tkanina', 'metal', 'drewno'].includes(i.Grupa));
+      variantLegsMaterials = data.filter(i => i.Grupa === 'wariant nogi'); // warianty nóg (np. do kubełków)
 
       chairTiles.innerHTML = '';
       chairs.forEach(chair => {
@@ -193,8 +214,9 @@
           <img src="${chair.Obrazek}" alt="${chair.Nazwa}" />
           <span>${chair.Nazwa}\nCena: ${chair.Cena || ''}</span>`;
         tile.addEventListener('click', () => {
+          currentChair = chair;
           loadModel(chair.Nazwa);
-          showMaterialUI(materials);
+          showMaterialUI(allMaterials, variantLegsMaterials, chair);
         });
         chairTiles.appendChild(tile);
       });
@@ -203,35 +225,97 @@
         materialSection.style.display = 'none';
         chairTiles.style.display = 'flex';
         backButton.style.display = 'none';
+        variantLegsSection.style.display = 'none';
+        currentChair = null;
       });
     }
 
-    function showMaterialUI(materials) {
+    function showMaterialUI(materials, variantLegs, chair) {
       chairTiles.style.display = 'none';
       materialSection.style.display = 'flex';
       backButton.style.display = 'block';
 
-      // Obsługa przycisków materiałów (np. nogi, siedzisko itd.)
+      // Pokaż/ukryj sekcję wariantów nóg zależnie od grupy
+      if (chair.Grupa === 'kubełek') {
+        variantLegsSection.style.display = 'flex';
+        setupVariantLegsButtons(variantLegs);
+      } else {
+        variantLegsSection.style.display = 'none';
+      }
+
+      // Obsługa przycisków materiałów (nogi, siedzisko, oparcie itd.)
       document.querySelectorAll('.material-buttons button').forEach(btn => {
         btn.onclick = () => {
-          const part = btn.dataset.part;
-          showMaterialsForPart(part, materials);
+          const part = btn.getAttribute('data-part');
+          // Filtrowanie materiałów zależnie od części
+          let filtered = [];
+          if (part === 'nogi') {
+            filtered = materials.filter(m => ['metal', 'drewno'].includes(m.Grupa));
+          } else if (['siedzisko', 'oparcie_wew', 'oparcie_zew'].includes(part)) {
+            filtered = materials.filter(m => m.Grupa === 'tkanina');
+          }
+          showMaterialTiles(filtered, part);
         };
       });
 
-      showMaterialsForPart('nogi', materials); // domyślnie
+      // Domyślnie pokaż tkaniny (siedzisko)
+      const siedziskoBtn = document.querySelector('.material-buttons button[data-part="siedzisko"]');
+      if (siedziskoBtn) siedziskoBtn.click();
     }
 
-    function showMaterialsForPart(part, materials) {
+    function showMaterialTiles(materials, part) {
       materialTiles.innerHTML = '';
-      const filtered = materials.filter(m => m.Element?.toLowerCase() === part);
-      filtered.forEach(mat => {
+      materials.forEach(mat => {
         const tile = document.createElement('div');
         tile.className = 'material-tile';
         tile.innerHTML = `
           <img src="${mat.Obrazek}" alt="${mat.Nazwa}" />
-          <span>${mat.Nazwa}</span>`;
+          <span>${mat.Nazwa}\nCena: ${mat.Cena || ''}</span>`;
+        tile.addEventListener('click', () => {
+          applyMaterialToModel(part, mat);
+        });
         materialTiles.appendChild(tile);
+      });
+    }
+
+    function applyMaterialToModel(part, material) {
+      if (!currentModel) return;
+
+      currentModel.traverse(child => {
+        if (child.isMesh) {
+          // Prosta przykładowa logika mapowania part->materiał w modelu
+          // Tu należy dopasować nazwy części w modelu do part
+          if (part === 'nogi' && child.name.toLowerCase().includes('legs')) {
+            child.material = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(material.Obrazek), metalness: 0.8, roughness: 0.3 });
+          }
+          if (part === 'siedzisko' && child.name.toLowerCase().includes('seat')) {
+            child.material = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(material.Obrazek), metalness: 0.1, roughness: 0.7 });
+          }
+          if (part === 'oparcie_wew' && child.name.toLowerCase().includes('back_inner')) {
+            child.material = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(material.Obrazek) });
+          }
+          if (part === 'oparcie_zew' && child.name.toLowerCase().includes('back_outer')) {
+            child.material = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(material.Obrazek) });
+          }
+          // Wariant nóg (jeśli będzie potrzebne)
+          if (part === 'variant_legs' && child.name.toLowerCase().includes('legs')) {
+            child.material = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(material.Obrazek), metalness: 0.9, roughness: 0.4 });
+          }
+        }
+      });
+    }
+
+    // Funkcja do utworzenia przycisków wariantów nóg
+    function setupVariantLegsButtons(variantLegs) {
+      variantLegsButtons.innerHTML = '';
+      variantLegs.forEach(leg => {
+        const btn = document.createElement('button');
+        btn.textContent = leg.Nazwa;
+        btn.title = leg.Nazwa;
+        btn.addEventListener('click', () => {
+          applyMaterialToModel('variant_legs', leg);
+        });
+        variantLegsButtons.appendChild(btn);
       });
     }
 
