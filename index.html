@@ -2,12 +2,13 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8" />
-<title>Test Modelu WebGi z SSR</title>
+<title>Test Modelu WebGi bez HDRI</title>
 <script type="importmap">
 {
   "imports": {
     "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
-    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
+    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs",
+    "three": "https://unpkg.com/three@0.154.0/build/three.module.js"
   }
 }
 </script>
@@ -19,7 +20,8 @@
   <canvas id="canvas"></canvas>
   <script type="module">
     import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, BaseGroundPlugin } from 'threepipe';
-    import { SSReflectionPlugin } from '@threepipe/webgi-plugins';
+    import { OutlinePlugin } from '@threepipe/webgi-plugins';
+    import * as THREE from 'three';
 
     async function init() {
       const canvas = document.getElementById('canvas');
@@ -28,31 +30,37 @@
         plugins: [
           LoadingScreenPlugin,
           GBufferPlugin,
-          SSReflectionPlugin,  // <--- SSReflectionPlugin musi być PRZED BaseGroundPlugin
-          BaseGroundPlugin
+          BaseGroundPlugin,
+          OutlinePlugin
         ],
         rendererSettings: { antialias: true }
       });
 
-      // ustaw pixel ratio przez renderManager (nie bezpośrednio przez viewer.renderer)
       viewer.renderManager.renderer.setPixelRatio(window.devicePixelRatio);
 
       try {
-        console.log("Ładuję environment mapę...");
-        await viewer.setEnvironmentMap('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr');
-
         console.log("Ładuję model...");
         await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
         console.log("Model załadowany");
+        console.log("Obiekty w scenie:", viewer.scene.children);
 
-      } catch(e) {
+        // Dodaj światło
+        const light = new THREE.DirectionalLight(0xffffff, 1);
+        light.position.set(10, 10, 10);
+        viewer.scene.add(light);
+
+        // Ustaw kamerę
+        viewer.camera.position.set(0, 1, 5);
+        viewer.camera.lookAt(0, 0, 0);
+
+      } catch (e) {
         console.error("Błąd ładowania modelu:", e);
       }
 
       window.addEventListener('resize', () => {
         canvas.style.width = window.innerWidth + 'px';
         canvas.style.height = window.innerHeight + 'px';
-        viewer.renderer.setSize(window.innerWidth, window.innerHeight);  // ta metoda jest OK
+        viewer.renderer.setSize(window.innerWidth, window.innerHeight);
       });
       window.dispatchEvent(new Event('resize'));
     }
