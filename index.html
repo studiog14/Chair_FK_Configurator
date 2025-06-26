@@ -20,42 +20,31 @@
       overflow: hidden;
       font-family: sans-serif;
     }
-
     #app {
       display: flex;
-      width: 100vw;
       height: 100vh;
+      width: 100vw;
     }
-
     #canvas {
-      flex: 1;
-      display: block;
+      flex: 1 1 0; /* pozwala canvasa zajmować pozostałą szerokość */
       background: #ddd;
     }
-
     #sidebar {
-      width: 320px;
+      flex: 0 0 320px;
       background: white;
       padding: 16px;
       overflow-y: auto;
       box-shadow: -2px 0 8px rgba(0,0,0,0.1);
-      z-index: 2;
+      z-index: 1;
     }
-
-    #sidebar h2 {
-      font-size: 18px;
-      margin-top: 0;
-    }
-
+    #sidebar h2 { margin: 0 0 12px; font-size: 18px; }
     .thumbnail {
       width: 100%;
-      height: auto;
       margin-bottom: 12px;
       border: 1px solid #ccc;
       cursor: pointer;
       transition: transform 0.2s;
     }
-
     .thumbnail:hover {
       transform: scale(1.03);
       border-color: #333;
@@ -75,9 +64,11 @@
     import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
     import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
+    let viewer;
+
     async function init() {
       const canvas = document.getElementById('canvas');
-      const viewer = new ThreeViewer({
+      viewer = new ThreeViewer({
         canvas,
         plugins: [
           LoadingScreenPlugin,
@@ -89,38 +80,59 @@
         rendererSettings: { antialias: true }
       });
 
-      // ✨ Lustro i oddalenie pozycji kamery
-      viewer.scene.activeCamera.position.set(-2.3, 1.5, 2.5); // lewa strona (odbicie) i lekkie oddalenie
-      viewer.scene.activeCamera.lookAt(0, 1.1, 0);
+      // Kamera – odbicie lustrzane i lekkie oddalenie
+      const cam = viewer.scene.activeCamera;
+      cam.position.set(-2.2, 1.6, 2.5);
+      cam.lookAt(0, 1.1, 0);
 
       try {
-        console.log("Ładuję HDR...");
         await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
-        console.log("HDR załadowany");
-
-        console.log("Ładuję model...");
         await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
-        console.log("Model załadowany");
-
         const ssaa = viewer.getPlugin(SSAAPlugin);
         if (ssaa) ssaa.setSampleLevel(6);
-
       } catch(e) {
-        console.error("Błąd ładowania:", e);
+        console.error("Błąd:", e);
       }
 
-      function resizeViewer() {
-        const canvas = viewer.renderer.domElement;
-        const sidebarWidth = document.getElementById('sidebar').offsetWidth;
-        const width = window.innerWidth - sidebarWidth;
-        const height = window.innerHeight;
-        canvas.style.width = width + 'px';
-        canvas.style.height = height + 'px';
-        viewer.renderer.setSize(width, height, false);
+      // --- TUTAJ DODAJEMY POBRANIE ARKUSZA I WYŚWIETLENIE MINIATUREK ---
+
+      const sheetUrl = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane'; // podmień na swój arkusz
+      const thumbnailsDiv = document.getElementById('thumbnails');
+
+      try {
+        const response = await fetch(sheetUrl);
+        const data = await response.json();
+
+        // Wstawiamy miniaturki krzeseł (kolumna Obrazek to URL, Nazwa to nazwa modelu)
+        data.forEach(item => {
+          if (!item.Obrazek) return; // pomijamy, jeśli brak obrazka
+
+          const img = document.createElement('img');
+          img.src = item.Obrazek;
+          img.alt = item.Nazwa || 'krzesło';
+          img.title = item.Nazwa || '';
+          img.className = 'thumbnail';
+
+          thumbnailsDiv.appendChild(img);
+        });
+      } catch(e) {
+        console.error('Błąd podczas pobierania miniaturek:', e);
       }
 
-      window.addEventListener('resize', resizeViewer);
-      resizeViewer(); // wywołaj od razu po załadowaniu
+      window.addEventListener('resize', resizeCanvas);
+      resizeCanvas();
+    }
+
+    function resizeCanvas() {
+      const sidebarWidth = document.getElementById('sidebar').offsetWidth;
+      const w = window.innerWidth - sidebarWidth;
+      viewer.renderer.setSize(w, window.innerHeight);
+      const canvas = document.getElementById('canvas');
+      canvas.style.width = w + 'px';
+      canvas.style.height = window.innerHeight + 'px';
+      const cam = viewer.scene.activeCamera;
+      cam.aspect = w / window.innerHeight;
+      cam.updateProjectionMatrix();
     }
 
     init();
