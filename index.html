@@ -26,7 +26,7 @@
       width: 100vw;
     }
     #canvas {
-      flex: 1 1 0; /* pozwala canvasa zajmować pozostałą szerokość */
+      flex: 1 1 0;
       background: #ddd;
     }
     #sidebar {
@@ -45,12 +45,42 @@
       cursor: pointer;
       transition: transform 0.2s;
       object-fit: contain;
-      height: 80px; /* zmniejszone ikony */
+      height: 80px;
     }
     .thumbnail:hover {
       transform: scale(1.03);
       border-color: #333;
     }
+    #legVariants {
+      margin-top: 16px;
+    }
+    #legButtons button {
+      margin: 4px 4px 4px 0;
+      padding: 6px 12px;
+      cursor: pointer;
+    }
+
+    #thumbnails, #legButtons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px; /* odstęp między kafelkami */
+}
+
+.thumbnail {
+  width: 80px;       /* szerokość kafelka */
+  height: 80px;      /* wysokość kafelka */
+  object-fit: contain;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  border-radius: 6px;
+  transition: transform 0.2s, border-color 0.2s;
+}
+
+.thumbnail:hover {
+  transform: scale(1.1);
+  border-color: #333;
+}
+
   </style>
 </head>
 <body>
@@ -59,15 +89,21 @@
     <div id="sidebar">
       <h2>Wybierz krzesło:</h2>
       <div id="thumbnails"></div>
+      <div id="legVariants" style="display:none;">
+        <h3>Wybierz wariant nóg:</h3>
+        <div id="legButtons"></div>
+      </div>
     </div>
   </div>
 
- <script type="module">
+  <script type="module">
   import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
   import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
   let viewer;
   let currentModelContainer = null;
+  let currentLegModel = null;  // model nóg
+  let globalSheetData = []; // przechowuje dane z arkusza
 
   async function init() {
     const canvas = document.getElementById('canvas');
@@ -85,15 +121,12 @@
 
     const cam = viewer.scene.activeCamera;
 
-// Oddal i podnieś kamerę bardziej, żeby objąć cały model
-cam.position.set(-2.2, 2.0, 4.0); // dalej i wyżej niż wcześniej
-cam.lookAt(0, 1.0, 0);
+    cam.position.set(-2.2, 2.0, 4.0);
+    cam.lookAt(0, 1.0, 0);
 
-// Zwiększ zakres widoku kamery (near i far plane)
-cam.near = 0.1;  // domyślnie może być np. 0.5 lub 1 - zmniejsz by nie ucinało bliskich części
-cam.far = 1000;
-cam.updateProjectionMatrix();
-
+    cam.near = 0.1;
+    cam.far = 1000;
+    cam.updateProjectionMatrix();
 
     try {
       await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
@@ -121,53 +154,123 @@ cam.updateProjectionMatrix();
     cam.updateProjectionMatrix();
   }
 
- async function loadDataFromSheet() {
-  const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
-  try {
-    const res = await fetch(sheetURL);
-    const data = await res.json();
+  async function loadDataFromSheet() {
+    const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+    try {
+      const res = await fetch(sheetURL);
+      const data = await res.json();
 
-    const thumbnailsDiv = document.getElementById('thumbnails');
-    thumbnailsDiv.innerHTML = '';
+      globalSheetData = data; // zapisz dane globalnie
 
-    // ✅ Pobierz modele z grupy "krzesło" lub "kubełek"
-    const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
+      const thumbnailsDiv = document.getElementById('thumbnails');
+      thumbnailsDiv.innerHTML = '';
 
-    async function loadModel(modelName) {
-      if (currentModelContainer) {
-        viewer.scene.remove(currentModelContainer);
-        currentModelContainer.dispose?.();
-        currentModelContainer = null;
+      // wybierz krzesła i kubełki z obrazkami
+      const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
+
+      async function loadModel(modelName) {
+        if (currentModelContainer) {
+          viewer.scene.remove(currentModelContainer);
+          currentModelContainer.dispose?.();
+          currentModelContainer = null;
+        }
+        if (currentLegModel) {
+          viewer.scene.remove(currentLegModel);
+          currentLegModel.dispose?.();
+          currentLegModel = null;
+        }
+
+        const modelPath = `chairs/${modelName}.glb`;
+        currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
       }
 
-      const modelPath = `chairs/${modelName}.glb`;
-      currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
+      for (const item of chairs) {
+        const img = document.createElement('img');
+        img.src = item.Obrazek;
+        img.alt = item.Nazwa || 'model';
+        img.title = item.Nazwa || '';
+        img.className = 'thumbnail';
+
+        img.addEventListener('click', async () => {
+          await loadModel(item.Nazwa);
+
+          if (item.Grupa === 'kubełek') {
+            // pokaż warianty nóg
+            const legVariants = globalSheetData.filter(d => d.Grupa === 'nogi' && d.Obrazek);
+            showLegVariants(true, legVariants);
+          } else {
+            showLegVariants(false);
+          }
+        });
+
+        thumbnailsDiv.appendChild(img);
+      }
+
+      // domyślnie załaduj pierwszy model i pokaż nogi jeśli kubełek
+      if (chairs.length > 0) {
+        await loadModel(chairs[0].Nazwa);
+        if (chairs[0].Grupa === 'kubełek') {
+          const legVariants = globalSheetData.filter(d => d.Grupa === 'nogi' && d.Obrazek);
+          showLegVariants(true, legVariants);
+        } else {
+          showLegVariants(false);
+        }
+      }
+
+    } catch (e) {
+      console.error("Błąd podczas pobierania danych z arkusza:", e);
     }
-
-    for (const item of chairs) {
-      const img = document.createElement('img');
-      img.src = item.Obrazek;
-      img.alt = item.Nazwa || 'model';
-      img.title = item.Nazwa || '';
-      img.className = 'thumbnail';
-
-      img.addEventListener('click', () => loadModel(item.Nazwa));
-      thumbnailsDiv.appendChild(img);
-    }
-
-    // ✅ Automatycznie załaduj pierwszy model
-    if (chairs.length > 0) {
-      await loadModel(chairs[0].Nazwa);
-    }
-
-  } catch (e) {
-    console.error("Błąd podczas pobierania danych z arkusza:", e);
   }
-}
 
+  function showLegVariants(show, variants = []) {
+    const legVariantsDiv = document.getElementById('legVariants');
+    const legButtonsDiv = document.getElementById('legButtons');
+    legButtonsDiv.innerHTML = '';
+
+    if (!show) {
+      legVariantsDiv.style.display = 'none';
+      return;
+    }
+
+    legVariantsDiv.style.display = 'block';
+
+    variants.forEach(variant => {
+      const img = document.createElement('img');
+      img.src = variant.Obrazek || '';
+      img.alt = variant.Nazwa || 'Nogi';
+      img.title = variant.Nazwa || '';
+      img.className = 'thumbnail';
+      img.style.height = '80px';
+      img.style.cursor = 'pointer';
+
+      img.addEventListener('click', async () => {
+        console.log('Wybrano wariant nóg:', variant.Nazwa);
+
+        if (currentLegModel) {
+          viewer.scene.remove(currentLegModel);
+          currentLegModel.dispose?.();
+          currentLegModel = null;
+        }
+
+        try {
+          const legModelPath = `legs/${variant.Nazwa}.glb`;
+          currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
+
+          // opcjonalnie ustaw pozycję nóg pod modelem kubełka
+          // currentLegModel.position.set(0, 0, 0);
+
+        } catch (e) {
+          console.error('Błąd ładowania modelu nóg:', e);
+        }
+      });
+
+      legButtonsDiv.appendChild(img);
+    });
+  }
 
   init();
 </script>
+
 
 </body>
 </html>
