@@ -102,9 +102,10 @@
 
   let viewer;
   let currentModelContainer = null;
-  let currentLegModel = null;  // model nóg
-  let globalSheetData = []; // przechowuje dane z arkusza
-  let currentLegHeight = 0; // aktualna wysokość nóg do podnoszenia kubełka
+  let currentLegModel = null;
+  let currentLegHeight = 0;
+  let currentModelGroup = null;
+  let globalSheetData = [];
 
   async function init() {
     const canvas = document.getElementById('canvas');
@@ -121,10 +122,8 @@
     });
 
     const cam = viewer.scene.activeCamera;
-
     cam.position.set(-2.2, 2.0, 4.0);
     cam.lookAt(0, 1.0, 0);
-
     cam.near = 0.1;
     cam.far = 1000;
     cam.updateProjectionMatrix();
@@ -161,15 +160,14 @@
       const res = await fetch(sheetURL);
       const data = await res.json();
 
-      globalSheetData = data; // zapisz dane globalnie
+      globalSheetData = data;
 
       const thumbnailsDiv = document.getElementById('thumbnails');
       thumbnailsDiv.innerHTML = '';
 
-      // wybierz krzesła i kubełki z obrazkami
       const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
 
-      async function loadModel(modelName) {
+      async function loadModel(modelName, group) {
         if (currentModelContainer) {
           viewer.scene.remove(currentModelContainer);
           currentModelContainer.dispose?.();
@@ -179,16 +177,18 @@
           viewer.scene.remove(currentLegModel);
           currentLegModel.dispose?.();
           currentLegModel = null;
-          currentLegHeight = 0; // resetuj wysokość nóg przy zmianie kubełka
+          currentLegHeight = 0;
         }
+
+        currentModelGroup = group;
 
         const modelPath = `chairs/${modelName}.glb`;
         currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
 
-        // Po załadowaniu kubełka ustaw jego pozycję Y wg aktualnej wysokości nóg
-        if (currentLegHeight && currentModelContainer) {
+        // ** Kluczowa część: reset pozycji Y lub podniesienie kubełka **
+        if (group === 'kubełek') {
           currentModelContainer.position.y = currentLegHeight;
-        } else if (currentModelContainer) {
+        } else {
           currentModelContainer.position.y = 0;
         }
       }
@@ -201,10 +201,9 @@
         img.className = 'thumbnail';
 
         img.addEventListener('click', async () => {
-          await loadModel(item.Nazwa);
+          await loadModel(item.Nazwa, item.Grupa);
 
           if (item.Grupa === 'kubełek') {
-            // pokaż warianty nóg
             const legVariants = globalSheetData.filter(d => d.Grupa === 'nogi' && d.Obrazek);
             showLegVariants(true, legVariants);
           } else {
@@ -215,9 +214,8 @@
         thumbnailsDiv.appendChild(img);
       }
 
-      // domyślnie załaduj pierwszy model i pokaż nogi jeśli kubełek
       if (chairs.length > 0) {
-        await loadModel(chairs[0].Nazwa);
+        await loadModel(chairs[0].Nazwa, chairs[0].Grupa);
         if (chairs[0].Grupa === 'kubełek') {
           const legVariants = globalSheetData.filter(d => d.Grupa === 'nogi' && d.Obrazek);
           showLegVariants(true, legVariants);
@@ -253,8 +251,6 @@
       img.style.cursor = 'pointer';
 
       img.addEventListener('click', async () => {
-        console.log('Wybrano wariant nóg:', variant.Nazwa);
-
         if (currentLegModel) {
           viewer.scene.remove(currentLegModel);
           currentLegModel.dispose?.();
@@ -265,16 +261,14 @@
           const legModelPath = `legs/${variant.Nazwa}.glb`;
           currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
 
-          // Pobierz wysokość nóg z danych arkusza
-          const legData = globalSheetData.find(d => d.Nazwa === variant.Nazwa && d.Grupa === 'nogi');
-          if (legData && legData.Wysokosc) {
-            currentLegHeight = parseFloat(legData.Wysokosc);
+          if (variant.Wysokosc) {
+            currentLegHeight = parseFloat(variant.Wysokosc);
           } else {
             currentLegHeight = 0;
           }
 
-          // Podnieś kubełek o wysokość nóg
-          if (currentModelContainer) {
+          // ** Kluczowa część: podnieś kubełek o wysokość nóg **
+          if (currentModelGroup === 'kubełek' && currentModelContainer) {
             currentModelContainer.position.y = currentLegHeight;
           }
 
@@ -289,6 +283,11 @@
 
   init();
 </script>
+
+
+  init();
+</script>
+
 
 
 
