@@ -266,21 +266,24 @@
     }
 
     try {
-      const legModelPath = `legs/${variant.Nazwa}.glb`;
-      currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
-      currentLegModel.position.set(0, 0, 0);
+  const legModelPath = `legs/${variant.Nazwa}.glb`;
+  currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
+  currentLegModel.position.set(0, 0, 0);
 
-      const legHeightCm = parseFloat(variant["Wysokość"]) || 0;
-      const legHeightM = legHeightCm / 100; // konwersja z cm na metry
-      currentLegHeight = legHeightM;
+  // Wczytanie wysokości nóg w mm i konwersja do metrów
+  const legHeightMm = parseFloat(variant["Wysokość"]) || 0;
+  const legHeightM = legHeightMm / 1000;  // mm na metry
+  currentLegHeight = legHeightM;
 
-      if (currentModelContainer) {
-        currentModelContainer.position.set(0, legHeightM, 0);
-      }
+  // Podniesienie kubełka o wysokość nóg w metrach
+  if (currentModelContainer) {
+    currentModelContainer.position.set(0, legHeightM, 0);
+  }
 
-    } catch (e) {
-      console.error('Błąd ładowania modelu nóg:', e);
-    }
+} catch (e) {
+  console.error('Błąd ładowania modelu nóg:', e);
+}
+
   }
 
   init();
