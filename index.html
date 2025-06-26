@@ -1,24 +1,78 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-<meta charset="UTF-8" />
-<title>WebGi z lokalnym HDRi</title>
-<script type="importmap">
-{
-  "imports": {
-    "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
-    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
-  }
-}
-</script>
-<style>
-  html, body, #canvas { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#222;}
-</style>
+  <meta charset="UTF-8" />
+  <title>Konfigurator krzeseł FK</title>
+  <script type="importmap">
+    {
+      "imports": {
+        "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
+        "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
+      }
+    }
+  </script>
+  <style>
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: sans-serif;
+    }
+
+    #app {
+      display: flex;
+      width: 100vw;
+      height: 100vh;
+    }
+
+    #canvas {
+      flex: 1;
+      display: block;
+      background: #ddd;
+    }
+
+    #sidebar {
+      width: 320px;
+      background: white;
+      padding: 16px;
+      overflow-y: auto;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+      z-index: 2;
+    }
+
+    #sidebar h2 {
+      font-size: 18px;
+      margin-top: 0;
+    }
+
+    .thumbnail {
+      width: 100%;
+      height: auto;
+      margin-bottom: 12px;
+      border: 1px solid #ccc;
+      cursor: pointer;
+      transition: transform 0.2s;
+    }
+
+    .thumbnail:hover {
+      transform: scale(1.03);
+      border-color: #333;
+    }
+  </style>
 </head>
 <body>
-  <canvas id="canvas"></canvas>
+  <div id="app">
+    <canvas id="canvas"></canvas>
+    <div id="sidebar">
+      <h2>Wybierz krzesło:</h2>
+      <div id="thumbnails"></div>
+    </div>
+  </div>
+
   <script type="module">
-    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin, BaseGroundPlugin } from 'threepipe';
+    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
     import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
     async function init() {
@@ -35,33 +89,38 @@
         rendererSettings: { antialias: true }
       });
 
-      viewer.renderManager.renderer.setPixelRatio(window.devicePixelRatio);
+      // ✨ Lustro i oddalenie pozycji kamery
+      viewer.scene.activeCamera.position.set(-2.3, 1.5, 2.5); // lewa strona (odbicie) i lekkie oddalenie
+      viewer.scene.activeCamera.lookAt(0, 1.1, 0);
 
       try {
-        console.log("Ładuję lokalne HDR...");
+        console.log("Ładuję HDR...");
         await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
-        console.log("HDRI załadowane");
+        console.log("HDR załadowany");
 
         console.log("Ładuję model...");
         await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
         console.log("Model załadowany");
 
         const ssaa = viewer.getPlugin(SSAAPlugin);
-        if (ssaa) {
-          console.log("Ustawiam SSAA sample level na 6");
-          ssaa.setSampleLevel(6);
-        }
+        if (ssaa) ssaa.setSampleLevel(6);
 
       } catch(e) {
-        console.error("Błąd ładowania modelu lub HDR:", e);
+        console.error("Błąd ładowania:", e);
       }
 
-      window.addEventListener('resize', () => {
-        canvas.style.width = window.innerWidth + 'px';
-        canvas.style.height = window.innerHeight + 'px';
-        viewer.renderer.setSize(window.innerWidth, window.innerHeight);
-      });
-      window.dispatchEvent(new Event('resize'));
+      function resizeViewer() {
+        const canvas = viewer.renderer.domElement;
+        const sidebarWidth = document.getElementById('sidebar').offsetWidth;
+        const width = window.innerWidth - sidebarWidth;
+        const height = window.innerHeight;
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        viewer.renderer.setSize(width, height, false);
+      }
+
+      window.addEventListener('resize', resizeViewer);
+      resizeViewer(); // wywołaj od razu po załadowaniu
     }
 
     init();
