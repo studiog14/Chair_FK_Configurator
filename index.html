@@ -44,6 +44,8 @@
       border: 1px solid #ccc;
       cursor: pointer;
       transition: transform 0.2s;
+      object-fit: contain;
+      height: 80px; /* zmniejszone ikony */
     }
     .thumbnail:hover {
       transform: scale(1.03);
@@ -65,6 +67,7 @@
     import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
     let viewer;
+    let currentModel = null;  // przechowuje aktualnie załadowany model 3D
 
     async function init() {
       const canvas = document.getElementById('canvas');
@@ -87,40 +90,18 @@
 
       try {
         await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
-        await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
+        // Załaduj domyślny model (np. pierwszy z listy) lub pusty - tutaj załadujemy pierwszy krzesło po fetch
+        // Dlatego na razie nie ładujemy modelu Fargo.glb
         const ssaa = viewer.getPlugin(SSAAPlugin);
         if (ssaa) ssaa.setSampleLevel(6);
       } catch(e) {
         console.error("Błąd:", e);
       }
 
-      // --- TUTAJ DODAJEMY POBRANIE ARKUSZA I WYŚWIETLENIE MINIATUREK ---
-
-      const sheetUrl = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane'; // podmień na swój arkusz
-      const thumbnailsDiv = document.getElementById('thumbnails');
-
-      try {
-        const response = await fetch(sheetUrl);
-        const data = await response.json();
-
-        // Wstawiamy miniaturki krzeseł (kolumna Obrazek to URL, Nazwa to nazwa modelu)
-        data.forEach(item => {
-          if (!item.Obrazek) return; // pomijamy, jeśli brak obrazka
-
-          const img = document.createElement('img');
-          img.src = item.Obrazek;
-          img.alt = item.Nazwa || 'krzesło';
-          img.title = item.Nazwa || '';
-          img.className = 'thumbnail';
-
-          thumbnailsDiv.appendChild(img);
-        });
-      } catch(e) {
-        console.error('Błąd podczas pobierania miniaturek:', e);
-      }
-
       window.addEventListener('resize', resizeCanvas);
       resizeCanvas();
+
+      await loadDataFromSheet();
     }
 
     function resizeCanvas() {
@@ -133,6 +114,64 @@
       const cam = viewer.scene.activeCamera;
       cam.aspect = w / window.innerHeight;
       cam.updateProjectionMatrix();
+    }
+
+    async function loadDataFromSheet() {
+      const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+      try {
+        const res = await fetch(sheetURL);
+        const data = await res.json();
+
+        const thumbnailsDiv = document.getElementById('thumbnails');
+        thumbnailsDiv.innerHTML = '';
+
+        // Filtruj tylko krzesła (grupa === "krzesło")
+        const chairs = data.filter(item => item.Grupa === "krzesło" && item.Obrazek);
+
+        chairs.forEach(item => {
+          const img = document.createElement('img');
+          img.src = item.Obrazek;
+          img.alt = item.Nazwa || 'krzesło';
+          img.title = item.Nazwa || '';
+          img.className = 'thumbnail';
+
+          img.addEventListener('click', async () => {
+            try {
+              // Usuń stary model, jeśli jest
+              if (currentModel) {
+                viewer.scene.remove(currentModel);
+                currentModel.traverse(child => {
+                  if (child.geometry) child.geometry.dispose();
+                  if (child.material) {
+                    if (Array.isArray(child.material)) {
+                      child.material.forEach(m => m.dispose());
+                    } else {
+                      child.material.dispose();
+                    }
+                  }
+                });
+                currentModel = null;
+              }
+
+              const modelPath = `chairs/${item.Nazwa}.glb`;
+              currentModel = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
+            } catch (e) {
+              console.error('Błąd podczas ładowania modelu:', e);
+            }
+          });
+
+          thumbnailsDiv.appendChild(img);
+        });
+
+        // Jeśli chcesz, możesz automatycznie załadować pierwszy model krzesła:
+        if (chairs.length > 0) {
+          const firstModelPath = `chairs/${chairs[0].Nazwa}.glb`;
+          currentModel = await viewer.load(firstModelPath, { autoCenter: true, autoScale: true });
+        }
+
+      } catch (e) {
+        console.error("Błąd podczas pobierania danych z arkusza:", e);
+      }
     }
 
     init();
