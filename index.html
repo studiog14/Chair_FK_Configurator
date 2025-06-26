@@ -83,10 +83,16 @@
       rendererSettings: { antialias: true }
     });
 
-    // Kamera – odbicie lustrzane i lekkie oddalenie
-const cam = viewer.scene.activeCamera;
-cam.position.set(-2.2, 1.6, 3.0);   // lekko dalej
-cam.lookAt(0, 1.0, 0);             // trochę niżej
+    const cam = viewer.scene.activeCamera;
+
+// Oddal i podnieś kamerę bardziej, żeby objąć cały model
+cam.position.set(-2.2, 2.0, 4.0); // dalej i wyżej niż wcześniej
+cam.lookAt(0, 1.0, 0);
+
+// Zwiększ zakres widoku kamery (near i far plane)
+cam.near = 0.1;  // domyślnie może być np. 0.5 lub 1 - zmniejsz by nie ucinało bliskich części
+cam.far = 1000;
+cam.updateProjectionMatrix();
 
 
     try {
