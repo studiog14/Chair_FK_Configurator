@@ -1,79 +1,60 @@
 <!DOCTYPE html>
 <html lang="pl">
 <head>
-  <meta charset="UTF-8" />
-  <title>Chairs WebGi - debugowanie SSAA</title>
-
-  <script type="importmap">
-  {
-    "imports": {
-      "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
-      "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
-    }
+<meta charset="UTF-8" />
+<title>Test Modelu WebGi z SSR</title>
+<script type="importmap">
+{
+  "imports": {
+    "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
+    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
   }
-  </script>
-
-  <style>
-    html, body {
-      margin: 0; 
-      height: 100%; 
-      width: 100%; 
-      overflow: hidden;
-      background-color: #222;
-    }
-    #canvas {
-      display: block;
-      width: 100vw;
-      height: 100vh;
-    }
-  </style>
+}
+</script>
+<style>
+  html, body, #canvas { margin:0; padding:0; width:100%; height:100%; overflow:hidden; background:#222;}
+</style>
 </head>
 <body>
   <canvas id="canvas"></canvas>
-
   <script type="module">
-    import { ThreeViewer, LoadingScreenPlugin, SSAAPlugin } from 'threepipe';
-    import { BloomPlugin } from '@threepipe/webgi-plugins';
+    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, BaseGroundPlugin } from 'threepipe';
+    import { SSReflectionPlugin } from '@threepipe/webgi-plugins';
 
     async function init() {
-      try {
-        const canvas = document.getElementById('canvas');
-        const viewer = new ThreeViewer({
-          canvas,
-          plugins: [
-            LoadingScreenPlugin,
-            SSAAPlugin,
-            BloomPlugin
-          ]
-        });
+      const canvas = document.getElementById('canvas');
+      const viewer = new ThreeViewer({
+        canvas,
+        plugins: [
+          LoadingScreenPlugin,
+          GBufferPlugin,
+          SSReflectionPlugin,  // <--- SSReflectionPlugin musi być PRZED BaseGroundPlugin
+          BaseGroundPlugin
+        ],
+        rendererSettings: { antialias: true }
+      });
 
-        console.log("ThreeViewer utworzony, ładuję środowisko HDR...");
+      // ustaw pixel ratio przez renderManager (nie bezpośrednio przez viewer.renderer)
+      viewer.renderManager.renderer.setPixelRatio(window.devicePixelRatio);
+
+      try {
+        console.log("Ładuję environment mapę...");
         await viewer.setEnvironmentMap('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr');
 
         console.log("Ładuję model...");
-        await viewer.load('chairs/Fargo.glb', { autoCenter:true, autoScale:true });
+        await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
+        console.log("Model załadowany");
 
-        console.log("Model załadowany.");
-
-        const ssaa = viewer.getPlugin(SSAAPlugin);
-        if (ssaa) {
-          console.log("SSAAPlugin dostępny, ustawiam poziom próbkowania...");
-          ssaa.setSampleLevel(9);
-        } else {
-          console.warn("SSAAPlugin nie znaleziony!");
-        }
-
-        function onResize() {
-          canvas.style.width = window.innerWidth + 'px';
-          canvas.style.height = window.innerHeight + 'px';
-          viewer.renderer.setSize(window.innerWidth, window.innerHeight);
-        }
-        window.addEventListener('resize', onResize);
-        onResize();
-
-      } catch (e) {
-        console.error("Błąd podczas inicjalizacji:", e);
+      } catch(e) {
+        console.error("Błąd ładowania modelu:", e);
       }
+
+      window.addEventListener('resize', () => {
+        canvas.style.width = window.innerWidth + 'px';
+        canvas.style.height = window.innerHeight + 'px';
+        viewer.renderer.setSize(window.innerWidth, window.innerHeight);  // ta metoda jest OK
+      });
+      window.dispatchEvent(new Event('resize'));
     }
 
     init();
