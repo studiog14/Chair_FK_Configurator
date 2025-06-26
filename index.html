@@ -2,12 +2,13 @@
 <html lang="pl">
 <head>
   <meta charset="UTF-8" />
-  <title>Test WebGi</title>
+  <title>Test WebGi - debugowanie SSAA</title>
 
   <script type="importmap">
   {
     "imports": {
-      "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs"
+      "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
+      "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
     }
   }
   </script>
@@ -18,6 +19,7 @@
       height: 100%; 
       width: 100%; 
       overflow: hidden;
+      background-color: #222;
     }
     #canvas {
       display: block;
@@ -30,28 +32,48 @@
   <canvas id="canvas"></canvas>
 
   <script type="module">
-    import { ThreeViewer, LoadingScreenPlugin } from 'threepipe';
+    import { ThreeViewer, LoadingScreenPlugin, SSAAPlugin } from 'threepipe';
+    import { BloomPlugin } from '@threepipe/webgi-plugins';
 
     async function init() {
-      const canvas = document.getElementById('canvas');
-      const viewer = new ThreeViewer({
-        canvas,
-        plugins: [LoadingScreenPlugin]
-      });
+      try {
+        const canvas = document.getElementById('canvas');
+        const viewer = new ThreeViewer({
+          canvas,
+          plugins: [
+            LoadingScreenPlugin,
+            SSAAPlugin,
+            BloomPlugin
+          ]
+        });
 
-      await viewer.setEnvironmentMap('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr');
+        console.log("ThreeViewer utworzony, ładuję środowisko HDR...");
+        await viewer.setEnvironmentMap('https://threejs.org/examples/textures/equirectangular/venice_sunset_1k.hdr');
 
-      await viewer.load('chairs/Fargo.glb', { autoCenter:true, autoScale:true });
+        console.log("Ładuję model...");
+        await viewer.load('chairs/Fargo.glb', { autoCenter:true, autoScale:true });
 
-      // Funkcja dopasowująca rozmiar renderera do rozmiaru okna
-      function onResize() {
-        canvas.style.width = window.innerWidth + 'px';
-        canvas.style.height = window.innerHeight + 'px';
-        viewer.renderer.setSize(window.innerWidth, window.innerHeight);
+        console.log("Model załadowany.");
+
+        const ssaa = viewer.getPlugin(SSAAPlugin);
+        if (ssaa) {
+          console.log("SSAAPlugin dostępny, ustawiam poziom próbkowania...");
+          ssaa.setSampleLevel(9);
+        } else {
+          console.warn("SSAAPlugin nie znaleziony!");
+        }
+
+        function onResize() {
+          canvas.style.width = window.innerWidth + 'px';
+          canvas.style.height = window.innerHeight + 'px';
+          viewer.renderer.setSize(window.innerWidth, window.innerHeight);
+        }
+        window.addEventListener('resize', onResize);
+        onResize();
+
+      } catch (e) {
+        console.error("Błąd podczas inicjalizacji:", e);
       }
-
-      window.addEventListener('resize', onResize);
-      onResize();
     }
 
     init();
