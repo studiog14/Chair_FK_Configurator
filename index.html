@@ -2,13 +2,12 @@
 <html lang="pl">
 <head>
 <meta charset="UTF-8" />
-<title>Test Modelu WebGi bez HDRI</title>
+<title>WebGi z lokalnym HDRi</title>
 <script type="importmap">
 {
   "imports": {
     "threepipe": "https://unpkg.com/threepipe@latest/dist/index.mjs",
-    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs",
-    "three": "https://unpkg.com/three@0.154.0/build/three.module.js"
+    "@threepipe/webgi-plugins": "https://unpkg.com/@threepipe/webgi-plugins@latest/dist/index.mjs"
   }
 }
 </script>
@@ -19,9 +18,8 @@
 <body>
   <canvas id="canvas"></canvas>
   <script type="module">
-    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, BaseGroundPlugin } from 'threepipe';
-    import { OutlinePlugin } from '@threepipe/webgi-plugins';
-    import * as THREE from 'three';
+    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin, BaseGroundPlugin } from 'threepipe';
+    import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
     async function init() {
       const canvas = document.getElementById('canvas');
@@ -30,8 +28,10 @@
         plugins: [
           LoadingScreenPlugin,
           GBufferPlugin,
+          SSAAPlugin,
+          SSReflectionPlugin,
           BaseGroundPlugin,
-          OutlinePlugin
+          BloomPlugin
         ],
         rendererSettings: { antialias: true }
       });
@@ -39,22 +39,22 @@
       viewer.renderManager.renderer.setPixelRatio(window.devicePixelRatio);
 
       try {
+        console.log("Ładuję lokalne HDR...");
+        await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
+        console.log("HDRI załadowane");
+
         console.log("Ładuję model...");
         await viewer.load('chairs/Fargo.glb', { autoCenter: true, autoScale: true });
         console.log("Model załadowany");
-        console.log("Obiekty w scenie:", viewer.scene.children);
 
-        // Dodaj światło
-        const light = new THREE.DirectionalLight(0xffffff, 1);
-        light.position.set(10, 10, 10);
-        viewer.scene.add(light);
+        const ssaa = viewer.getPlugin(SSAAPlugin);
+        if (ssaa) {
+          console.log("Ustawiam SSAA sample level na 6");
+          ssaa.setSampleLevel(6);
+        }
 
-        // Ustaw kamerę
-        viewer.camera.position.set(0, 1, 5);
-        viewer.camera.lookAt(0, 0, 0);
-
-      } catch (e) {
-        console.error("Błąd ładowania modelu:", e);
+      } catch(e) {
+        console.error("Błąd ładowania modelu lub HDR:", e);
       }
 
       window.addEventListener('resize', () => {
