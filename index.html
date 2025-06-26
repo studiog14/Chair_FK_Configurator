@@ -83,9 +83,11 @@
       rendererSettings: { antialias: true }
     });
 
-    const cam = viewer.scene.activeCamera;
-    cam.position.set(-2.2, 1.6, 2.5);
-    cam.lookAt(0, 1.1, 0);
+    // Kamera – odbicie lustrzane i lekkie oddalenie
+const cam = viewer.scene.activeCamera;
+cam.position.set(-2.2, 1.6, 3.0);   // lekko dalej
+cam.lookAt(0, 1.0, 0);             // trochę niżej
+
 
     try {
       await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
