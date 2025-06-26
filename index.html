@@ -104,6 +104,7 @@
   let currentModelContainer = null;
   let currentLegModel = null;  // model nóg
   let globalSheetData = []; // przechowuje dane z arkusza
+  let currentLegHeight = 0; // aktualna wysokość nóg do podnoszenia kubełka
 
   async function init() {
     const canvas = document.getElementById('canvas');
@@ -178,10 +179,18 @@
           viewer.scene.remove(currentLegModel);
           currentLegModel.dispose?.();
           currentLegModel = null;
+          currentLegHeight = 0; // resetuj wysokość nóg przy zmianie kubełka
         }
 
         const modelPath = `chairs/${modelName}.glb`;
         currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
+
+        // Po załadowaniu kubełka ustaw jego pozycję Y wg aktualnej wysokości nóg
+        if (currentLegHeight && currentModelContainer) {
+          currentModelContainer.position.y = currentLegHeight;
+        } else if (currentModelContainer) {
+          currentModelContainer.position.y = 0;
+        }
       }
 
       for (const item of chairs) {
@@ -256,8 +265,18 @@
           const legModelPath = `legs/${variant.Nazwa}.glb`;
           currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
 
-          // opcjonalnie ustaw pozycję nóg pod modelem kubełka
-          // currentLegModel.position.set(0, 0, 0);
+          // Pobierz wysokość nóg z danych arkusza
+          const legData = globalSheetData.find(d => d.Nazwa === variant.Nazwa && d.Grupa === 'nogi');
+          if (legData && legData.Wysokosc) {
+            currentLegHeight = parseFloat(legData.Wysokosc);
+          } else {
+            currentLegHeight = 0;
+          }
+
+          // Podnieś kubełek o wysokość nóg
+          if (currentModelContainer) {
+            currentModelContainer.position.y = currentLegHeight;
+          }
 
         } catch (e) {
           console.error('Błąd ładowania modelu nóg:', e);
@@ -270,6 +289,7 @@
 
   init();
 </script>
+
 
 
 </body>
