@@ -97,7 +97,7 @@
 
   </div>
 
-  <script type="module">
+ <script type="module">
   import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
   import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
@@ -114,7 +114,7 @@
   let selectedChair = null;
   let selectedLeg = null;
 
-    async function init() {
+  async function init() {
     const canvas = document.getElementById('canvas');
     viewer = new ThreeViewer({
       canvas,
@@ -235,6 +235,7 @@
       selectedLegThumbnail = null;
       updateSummary();
 
+      // --- TU DODAŁEM LOGIKĘ POKAZYWANIA NÓG ---
       if (chairData && chairData.Grupa === "kubełek") {
         legsDiv.style.display = 'flex';
         separator.style.display = 'block';
@@ -243,6 +244,7 @@
         legsDiv.style.display = 'none';
         separator.style.display = 'none';
       }
+      // --- KONIEC DODATKU ---
 
     } catch (e) {
       console.error("Błąd ładowania modelu:", e);
@@ -250,65 +252,10 @@
   }
 
   function renderLegsThumbnails() {
-  const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
-  legsThumbnailsDiv.innerHTML = '';
+    const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
+    legsThumbnailsDiv.innerHTML = '';
 
-  legsData.forEach(item => {
-    const wrapper = document.createElement('div');
-    wrapper.style.display = 'inline-block';
-    wrapper.style.marginRight = '6px';
-    wrapper.style.textAlign = 'center';
-
-    const img = document.createElement('img');
-    img.src = item.Obrazek;
-    img.alt = item.Nazwa || 'nogi';
-    img.title = item.Nazwa || '';
-    img.className = 'thumbnail';
-    img.style.width = '60px';
-    img.style.height = '60px';
-
-    img.addEventListener('click', () => {
-      applyLegVariant(item);
-      highlightSelectedThumbnail(img, legsThumbnailsDiv);
-    });
-
-    const caption = document.createElement('div');
-    caption.style.fontSize = '12px';
-    caption.style.marginTop = '2px';
-    caption.style.color = '#222';
-    caption.innerHTML = `
-      <strong>${item.Nazwa}</strong><br/>
-      <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
-    `;
-
-    wrapper.appendChild(img);
-    wrapper.appendChild(caption);
-    legsThumbnailsDiv.appendChild(wrapper);
-  });
-}
-
-
-  function highlightSelectedThumbnail(selectedImg, container) {
-    const thumbnails = container.querySelectorAll('.thumbnail');
-    thumbnails.forEach(img => img.classList.remove('selected'));
-    selectedImg.classList.add('selected');
-    selectedChairThumbnail = selectedImg;
-  }
-
- async function loadDataFromSheet() {
-  const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
-  try {
-    const res = await fetch(sheetURL);
-    const data = await res.json();
-    globalSheetData = data;
-
-    const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
-    legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
-
-    const thumbnailsDiv = document.getElementById('thumbnails');
-    thumbnailsDiv.innerHTML = '';
-
-    for (const item of chairs) {
+    legsData.forEach(item => {
       const wrapper = document.createElement('div');
       wrapper.style.display = 'inline-block';
       wrapper.style.marginRight = '6px';
@@ -316,15 +263,15 @@
 
       const img = document.createElement('img');
       img.src = item.Obrazek;
-      img.alt = item.Nazwa || 'model';
+      img.alt = item.Nazwa || 'nogi';
       img.title = item.Nazwa || '';
       img.className = 'thumbnail';
       img.style.width = '60px';
       img.style.height = '60px';
 
-      img.addEventListener('click', async () => {
-        await loadModel(item.Nazwa);
-        highlightSelectedThumbnail(img, thumbnailsDiv);
+      img.addEventListener('click', () => {
+        setLegModel(item);
+        highlightSelectedThumbnail(img, legsThumbnailsDiv);
       });
 
       const caption = document.createElement('div');
@@ -338,17 +285,71 @@
 
       wrapper.appendChild(img);
       wrapper.appendChild(caption);
-      thumbnailsDiv.appendChild(wrapper);
-    }
-
-    if (chairs.length > 0) {
-      await loadModel(chairs[0].Nazwa);
-      highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
-    }
-  } catch (e) {
-    console.error("Błąd pobierania danych z arkusza:", e);
+      legsThumbnailsDiv.appendChild(wrapper);
+    });
   }
-}
+
+  function highlightSelectedThumbnail(selectedImg, container) {
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    thumbnails.forEach(img => img.classList.remove('selected'));
+    selectedImg.classList.add('selected');
+    selectedChairThumbnail = selectedImg;
+  }
+
+  async function loadDataFromSheet() {
+    const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+    try {
+      const res = await fetch(sheetURL);
+      const data = await res.json();
+      globalSheetData = data;
+
+      const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
+      legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
+
+      const thumbnailsDiv = document.getElementById('thumbnails');
+      thumbnailsDiv.innerHTML = '';
+
+      for (const item of chairs) {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'inline-block';
+        wrapper.style.marginRight = '6px';
+        wrapper.style.textAlign = 'center';
+
+        const img = document.createElement('img');
+        img.src = item.Obrazek;
+        img.alt = item.Nazwa || 'model';
+        img.title = item.Nazwa || '';
+        img.className = 'thumbnail';
+        img.style.width = '60px';
+        img.style.height = '60px';
+
+        img.addEventListener('click', async () => {
+          await loadModel(item.Nazwa);
+          highlightSelectedThumbnail(img, thumbnailsDiv);
+        });
+
+        const caption = document.createElement('div');
+        caption.style.fontSize = '12px';
+        caption.style.marginTop = '2px';
+        caption.style.color = '#222';
+        caption.innerHTML = `
+          <strong>${item.Nazwa}</strong><br/>
+          <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
+        `;
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(caption);
+        thumbnailsDiv.appendChild(wrapper);
+      }
+
+      if (chairs.length > 0) {
+        await loadModel(chairs[0].Nazwa);
+        highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
+      }
+    } catch (e) {
+      console.error("Błąd pobierania danych z arkusza:", e);
+    }
+  }
 
   function updateSummary() {
     const summaryDiv = document.getElementById('summary');
@@ -372,6 +373,9 @@
   }
 
   init();
+
+
+
 
 </script>
 
