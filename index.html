@@ -129,7 +129,7 @@
     cam.updateProjectionMatrix();
 
     try {
-      await viewer.setEnvironmentMap('hdr/blocky_photo_studio_1k.hdr', { isHDR: true });
+      await viewer.setEnvironmentMap('hdr/old_apartments_walkway_1k.hdr', { isHDR: true });
       const ssaa = viewer.getPlugin(SSAAPlugin);
       if (ssaa) ssaa.setSampleLevel(6);
     } catch (e) {
@@ -206,6 +206,8 @@
         currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
         currentModelContainer.position.set(0, -1, 0);
       }
+
+      
 
       for (const item of chairs) {
         const img = document.createElement('img');
@@ -316,7 +318,14 @@
       currentModelContainer.position.y = offset;
 
       console.log(`Kubełek przesunięty o ${offset.toFixed(3)} (lowestY: ${lowestY.toFixed(3)}, legHeight: ${legHeight.toFixed(3)})`);
-    } else if (currentModelContainer) {
+    } else if (currentModelContainer)
+     // ⬛ Ustaw stałą pozycję kamery dla kubełka z nogami
+    if (currentChairGroup === 'kubełek') {
+      const cam = viewer.scene.activeCamera;
+      cam.position.set(-2.0, 1.8, 4.0);  // możesz lekko dostroić wartości
+      cam.lookAt(0, 1.0, 0);
+      cam.updateProjectionMatrix();
+    } {
       currentModelContainer.position.y = 0;
     }
 
@@ -325,6 +334,19 @@
   }
 }
 
+function centerCameraOnModel(model) {
+  if (!model) return;
+  
+  const box = new THREE.Box3().setFromObject(model);
+  const center = box.getCenter(new THREE.Vector3());
+  const size = box.getSize(new THREE.Vector3());
+
+  const cam = viewer.scene.activeCamera;
+
+  cam.position.set(center.x, center.y + size.y * 0.5, center.z + size.z * 2);
+  cam.lookAt(center);
+  cam.updateProjectionMatrix();
+}
 
 
   init();
