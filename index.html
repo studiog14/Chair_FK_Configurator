@@ -265,63 +265,67 @@
     });
   }
 
-  async function setLegModel(variant) {
-    if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
-      currentLegModel.dispose?.();
-      currentLegModel = null;
-    }
+ async function setLegModel(variant) {
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+  }
 
-    try {
-      const legModelPath = `legs/${variant.Nazwa}.glb`;
-      const newLegModel = await viewer.load(legModelPath, {
-        autoCenter: false,
-        autoScale: true
-      });
+  try {
+    const legModelPath = `legs/${variant.Nazwa}.glb`;
+    const newLegModel = await viewer.load(legModelPath, {
+      autoCenter: false,
+      autoScale: true
+    });
 
-      currentLegModel = newLegModel;
-      viewer.scene.add(currentLegModel);
+    currentLegModel = newLegModel;
+    viewer.scene.add(currentLegModel);
 
-      // Znajdź najwyższy punkt nóg (max Y)
-      let highestY = -Infinity;
-      currentLegModel.traverse((child) => {
+    // Szukamy najwyższego punktu nóg
+    let highestY = -Infinity;
+    currentLegModel.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.computeBoundingBox();
+        const attr = child.geometry.attributes.position;
+        for (let i = 0; i < attr.count; i++) {
+          const y = attr.getY(i) * child.scale.y + child.position.y;
+          if (y > highestY) highestY = y;
+        }
+      }
+    });
+
+    console.log("Najwyższy punkt nóg (highestY):", highestY);
+
+    if (currentModelContainer && currentChairGroup === 'kubełek') {
+      let lowestY = Infinity;
+      currentModelContainer.traverse((child) => {
         if (child.isMesh) {
           child.geometry.computeBoundingBox();
           const attr = child.geometry.attributes.position;
           for (let i = 0; i < attr.count; i++) {
             const y = attr.getY(i) * child.scale.y + child.position.y;
-            if (y > highestY) highestY = y;
+            if (y < lowestY) lowestY = y;
           }
         }
       });
 
-      // Przesuń nogi tak, by ich góra była na Y=0 (origin na górze)
-      currentLegModel.position.y = -highestY;
+      console.log("Najniższy punkt kubełka (lowestY):", lowestY);
 
-      // Jeśli kubełek i jest załadowany, ustaw kubełek na szczycie nóg
-      if (currentModelContainer && currentChairGroup === 'kubełek') {
-        let lowestY = Infinity;
-        currentModelContainer.traverse((child) => {
-          if (child.isMesh) {
-            child.geometry.computeBoundingBox();
-            const attr = child.geometry.attributes.position;
-            for (let i = 0; i < attr.count; i++) {
-              const y = attr.getY(i) * child.scale.y + child.position.y;
-              if (y < lowestY) lowestY = y;
-            }
-          }
-        });
+      let offsetY = highestY - lowestY;
+      const correction = 1.40; // poprawka do eksperymentów
+      offsetY += correction;
 
-        const offsetY = highestY - lowestY;
-        currentModelContainer.position.y = offsetY;
-      } else if (currentModelContainer) {
-        currentModelContainer.position.y = 0;
-      }
+      console.log("Przesunięcie kubełka (offsetY):", offsetY);
 
-    } catch (e) {
-      console.error('Błąd ładowania nóg:', e);
+      currentModelContainer.position.y = offsetY;
+    } else if (currentModelContainer) {
+      currentModelContainer.position.y = 0;
     }
+
+  } catch (e) {
+    console.error('Błąd ładowania nóg:', e);
   }
+}
+
 
   init();
 </script>
