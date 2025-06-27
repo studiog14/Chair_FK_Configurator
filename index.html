@@ -129,7 +129,7 @@
     cam.updateProjectionMatrix();
 
     try {
-      await viewer.setEnvironmentMap('hdr/hamburg_hbf_4k.hdr', { isHDR: true });
+      await viewer.setEnvironmentMap('hdr/blocky_photo_studio_1k.hdr', { isHDR: true });
       const ssaa = viewer.getPlugin(SSAAPlugin);
       if (ssaa) ssaa.setSampleLevel(6);
     } catch (e) {
