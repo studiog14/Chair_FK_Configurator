@@ -270,32 +270,58 @@
   async function setLegModel(variant) {
   if (currentLegModel) {
     viewer.scene.remove(currentLegModel);
-    currentLegModel.dispose?.();
-    currentLegModel = null;
   }
 
   try {
     const legModelPath = `legs/${variant.Nazwa}.glb`;
-    currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
+    const newLegModel = await viewer.load(legModelPath, {
+      autoCenter: false,
+      autoScale: true
+    });
 
-    // Pobierz bounding box nóg
-    const bboxLegs = new THREE.Box3().setFromObject(currentLegModel);
-    const heightLegs = bboxLegs.max.y - bboxLegs.min.y;
+    currentLegModel = newLegModel;
+    viewer.scene.add(currentLegModel);
 
-    // Ustaw nogi tak, by ich origin był na górze nóg (przesuń nogi o -bboxLegs.max.y)
-    currentLegModel.position.y = -bboxLegs.max.y;
+    // Szukamy najwyższego punktu nóg
+    let highestY = -Infinity;
+    currentLegModel.traverse((child) => {
+      if (child.isMesh) {
+        child.geometry.computeBoundingBox();
+        const attr = child.geometry.attributes.position;
+        for (let i = 0; i < attr.count; i++) {
+          const y = attr.getY(i) * child.scale.y + child.position.y;
+          if (y > highestY) highestY = y;
+        }
+      }
+    });
 
-    // Podnieś kubełek o wysokość nóg (bounding box)
+    // Przesuń kubełek jeśli istnieje i to grupa 'kubełek'
     if (currentModelContainer && currentChairGroup === 'kubełek') {
-      currentModelContainer.position.y = heightLegs;
+      let lowestY = Infinity;
+      currentModelContainer.traverse((child) => {
+        if (child.isMesh) {
+          child.geometry.computeBoundingBox();
+          const attr = child.geometry.attributes.position;
+          for (let i = 0; i < attr.count; i++) {
+            const y = attr.getY(i) * child.scale.y + child.position.y;
+            if (y < lowestY) lowestY = y;
+          }
+        }
+      });
+
+      const offsetY = highestY - lowestY;
+      currentModelContainer.position.y = offsetY;
     } else if (currentModelContainer) {
       currentModelContainer.position.y = 0;
     }
 
   } catch (e) {
-    console.error('Błąd ładowania modelu nóg:', e);
+    console.error('Błąd ładowania nóg:', e);
   }
 }
+
+
+
 
 
   init();
