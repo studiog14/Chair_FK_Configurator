@@ -105,6 +105,7 @@
   let currentLegModel = null;
   let globalSheetData = [];
   let currentLegHeight = 0;
+  let currentChairGroup = null;  // Dodane do śledzenia grupy aktualnego krzesła
 
   async function init() {
     const canvas = document.getElementById('canvas');
@@ -180,6 +181,14 @@
         }
 
         currentLegHeight = 0;
+        currentChairGroup = null; // wyzeruj grupę przy ładowaniu nowego modelu
+
+        // Znajdź grupę dla modelu (żeby potem wiedzieć czy podnosić kubełek)
+        const chairData = globalSheetData.find(d => d.Nazwa === modelName);
+        if (chairData) {
+          currentChairGroup = chairData.Grupa;
+        }
+
         const modelPath = `chairs/${modelName}.glb`;
         currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
         currentModelContainer.position.set(0, 0, 0);
@@ -259,32 +268,35 @@
   }
 
   async function setLegModel(variant) {
-    if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
-      currentLegModel.dispose?.();
-      currentLegModel = null;
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+    currentLegModel.dispose?.();
+    currentLegModel = null;
+  }
+
+  try {
+    const legModelPath = `legs/${variant.Nazwa}.glb`;
+    currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
+
+    // Pobierz bounding box nóg
+    const bboxLegs = new THREE.Box3().setFromObject(currentLegModel);
+    const heightLegs = bboxLegs.max.y - bboxLegs.min.y;
+
+    // Ustaw nogi tak, by ich origin był na górze nóg (przesuń nogi o -bboxLegs.max.y)
+    currentLegModel.position.y = -bboxLegs.max.y;
+
+    // Podnieś kubełek o wysokość nóg (bounding box)
+    if (currentModelContainer && currentChairGroup === 'kubełek') {
+      currentModelContainer.position.y = heightLegs;
+    } else if (currentModelContainer) {
+      currentModelContainer.position.y = 0;
     }
 
-    try {
-  const legModelPath = `legs/${variant.Nazwa}.glb`;
-  currentLegModel = await viewer.load(legModelPath, { autoCenter: false, autoScale: true });
-  currentLegModel.position.set(0, 0, 0);
-
-  // Wczytanie wysokości nóg w mm i konwersja do metrów
-  const legHeightMm = parseFloat(variant["Wysokość"]) || 0;
-  const legHeightM = legHeightMm / 1000;  // mm na metry
-  currentLegHeight = legHeightM;
-
-  // Podniesienie kubełka o wysokość nóg w metrach
-  if (currentModelContainer) {
-    currentModelContainer.position.set(0, legHeightM, 0);
+  } catch (e) {
+    console.error('Błąd ładowania modelu nóg:', e);
   }
-
-} catch (e) {
-  console.error('Błąd ładowania modelu nóg:', e);
 }
 
-  }
 
   init();
 </script>
