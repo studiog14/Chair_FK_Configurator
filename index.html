@@ -207,8 +207,6 @@
         currentModelContainer.position.set(0, -1, 0);
       }
 
-      
-
       for (const item of chairs) {
         const img = document.createElement('img');
         img.src = item.Obrazek;
@@ -281,76 +279,69 @@
   }
 
   async function setLegModel(variant) {
-  if (currentLegModel) {
-    viewer.scene.remove(currentLegModel);
-  }
-
-  try {
-    const legModelPath = `legs/${variant.Nazwa}.glb`;
-    const newLegModel = await viewer.load(legModelPath, {
-      autoCenter: false,
-      autoScale: true
-    });
-
-    currentLegModel = newLegModel;
-    viewer.scene.add(currentLegModel);
-
-    // 🟨 Pobierz wysokość nóg z arkusza
-    let legHeight = parseFloat(variant.height);
-    if (isNaN(legHeight)) {
-      legHeight = 1.4; // domyślna wartość jeśli puste
+    if (currentLegModel) {
+      viewer.scene.remove(currentLegModel);
     }
 
-    // 🟩 Przesuń kubełek (tylko jeśli jest kubełek)
-    if (currentModelContainer && currentChairGroup === 'kubełek') {
-      let lowestY = Infinity;
-
-      currentModelContainer.traverse((child) => {
-        if (child.isMesh) {
-          child.geometry.computeBoundingBox();
-          const bbox = child.geometry.boundingBox;
-          const minY = bbox.min.y * child.scale.y + child.position.y;
-          if (minY < lowestY) lowestY = minY;
-        }
+    try {
+      const legModelPath = `legs/${variant.Nazwa}.glb`;
+      const newLegModel = await viewer.load(legModelPath, {
+        autoCenter: false,
+        autoScale: true
       });
 
-      const offset = legHeight - lowestY; // nowa pozycja kubełka
-      currentModelContainer.position.y = offset;
+      currentLegModel = newLegModel;
+      viewer.scene.add(currentLegModel);
 
-      console.log(`Kubełek przesunięty o ${offset.toFixed(3)} (lowestY: ${lowestY.toFixed(3)}, legHeight: ${legHeight.toFixed(3)})`);
-    } else if (currentModelContainer)
-     // ⬛ Ustaw stałą pozycję kamery dla kubełka z nogami
-    if (currentChairGroup === 'kubełek') {
-      const cam = viewer.scene.activeCamera;
-      cam.position.set(-2.0, 1.8, 4.0);  // możesz lekko dostroić wartości
-      cam.lookAt(0, 1.0, 0);
-      cam.updateProjectionMatrix();
-    } {
-      currentModelContainer.position.y = 0;
+      // 🟨 Pobierz wysokość nóg z arkusza
+      let legHeight = parseFloat(variant.height);
+      if (isNaN(legHeight)) {
+        legHeight = 1.4; // domyślna wartość jeśli puste
+      }
+
+      // 🟩 Przesuń kubełek (tylko jeśli jest kubełek)
+      if (currentModelContainer && currentChairGroup === 'kubełek') {
+        let lowestY = Infinity;
+
+        currentModelContainer.traverse((child) => {
+          if (child.isMesh) {
+            child.geometry.computeBoundingBox();
+            const bbox = child.geometry.boundingBox;
+            const minY = bbox.min.y * child.scale.y + child.position.y;
+            if (minY < lowestY) lowestY = minY;
+          }
+        });
+
+        const offset = legHeight - lowestY; // nowa pozycja kubełka
+        currentModelContainer.position.y = offset;
+
+        console.log(`Kubełek przesunięty o ${offset.toFixed(3)} (lowestY: ${lowestY.toFixed(3)}, legHeight: ${legHeight.toFixed(3)})`);
+      } else if (currentModelContainer) {
+        currentModelContainer.position.y = 0;
+      }
+
+    } catch (e) {
+      console.error('Błąd ładowania nóg:', e);
     }
-
-  } catch (e) {
-    console.error('Błąd ładowania nóg:', e);
   }
-}
 
-function centerCameraOnModel(model) {
-  if (!model) return;
-  
-  const box = new THREE.Box3().setFromObject(model);
-  const center = box.getCenter(new THREE.Vector3());
-  const size = box.getSize(new THREE.Vector3());
+  function centerCameraOnModel(model) {
+    if (!model) return;
+    
+    const box = new THREE.Box3().setFromObject(model);
+    const center = box.getCenter(new THREE.Vector3());
+    const size = box.getSize(new THREE.Vector3());
 
-  const cam = viewer.scene.activeCamera;
+    const cam = viewer.scene.activeCamera;
 
-  cam.position.set(center.x, center.y + size.y * 0.5, center.z + size.z * 2);
-  cam.lookAt(center);
-  cam.updateProjectionMatrix();
-}
-
+    cam.position.set(center.x, center.y + size.y * 0.5, center.z + size.z * 2);
+    cam.lookAt(center);
+    cam.updateProjectionMatrix();
+  }
 
   init();
 </script>
+
 
 
 
