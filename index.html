@@ -107,6 +107,14 @@
   let globalSheetData = [];
   let currentChairGroup = null;
 
+function centerAndAlignToGround(object) {
+  const box = new THREE.Box3().setFromObject(object);
+  const center = box.getCenter(new THREE.Vector3());
+  object.position.x -= center.x;
+  object.position.z -= center.z;
+  object.position.y -= box.min.y;
+}
+
   async function init() {
     const canvas = document.getElementById('canvas');
     viewer = new ThreeViewer({
@@ -121,9 +129,11 @@
       rendererSettings: { antialias: true }
     });
 
+    
+
     const cam = viewer.scene.activeCamera;
-cam.position.set(0, 1.3, 2.4);
-cam.lookAt(0, 0.6, 0);
+cam.position.set(-3.2, 1.4, 2);
+cam.lookAt(0, 2, 0);
 cam.near = 0.1;
 cam.far = 1000;
 cam.updateProjectionMatrix();
