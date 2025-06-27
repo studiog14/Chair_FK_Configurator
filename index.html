@@ -204,7 +204,7 @@
 
         const modelPath = `chairs/${modelName}.glb`;
         currentModelContainer = await viewer.load(modelPath, { autoCenter: true, autoScale: true });
-        currentModelContainer.position.set(0, 0, 0);
+        currentModelContainer.position.set(0, -1, 0);
       }
 
       for (const item of chairs) {
