@@ -279,63 +279,53 @@
   }
 
   async function setLegModel(variant) {
-    if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+  }
+
+  try {
+    const legModelPath = `legs/${variant.Nazwa}.glb`;
+    const newLegModel = await viewer.load(legModelPath, {
+      autoCenter: false,
+      autoScale: true
+    });
+
+    currentLegModel = newLegModel;
+    viewer.scene.add(currentLegModel);
+
+    // 🟨 Pobierz wysokość nóg z arkusza
+    let legHeight = parseFloat(variant.height);
+    if (isNaN(legHeight)) {
+      legHeight = 1.4; // domyślna wartość jeśli puste
     }
 
-    try {
-      const legModelPath = `legs/${variant.Nazwa}.glb`;
-      const newLegModel = await viewer.load(legModelPath, {
-        autoCenter: false,
-        autoScale: true
-      });
+    // 🟩 Przesuń kubełek (tylko jeśli jest kubełek)
+    if (currentModelContainer && currentChairGroup === 'kubełek') {
+      let lowestY = Infinity;
 
-      currentLegModel = newLegModel;
-      viewer.scene.add(currentLegModel);
-
-      let highestY = -Infinity;
-      currentLegModel.traverse((child) => {
+      currentModelContainer.traverse((child) => {
         if (child.isMesh) {
           child.geometry.computeBoundingBox();
-          const attr = child.geometry.attributes.position;
-          for (let i = 0; i < attr.count; i++) {
-            const y = attr.getY(i) * child.scale.y + child.position.y;
-            if (y > highestY) highestY = y;
-          }
+          const bbox = child.geometry.boundingBox;
+          const minY = bbox.min.y * child.scale.y + child.position.y;
+          if (minY < lowestY) lowestY = minY;
         }
       });
 
-      console.log("Najwyższy punkt nóg (highestY):", highestY);
+      const offset = legHeight - lowestY; // nowa pozycja kubełka
+      currentModelContainer.position.y = offset;
 
-      if (currentModelContainer && currentChairGroup === 'kubełek') {
-        let lowestY = Infinity;
-        currentModelContainer.traverse((child) => {
-          if (child.isMesh) {
-            child.geometry.computeBoundingBox();
-            const attr = child.geometry.attributes.position;
-            for (let i = 0; i < attr.count; i++) {
-              const y = attr.getY(i) * child.scale.y + child.position.y;
-              if (y < lowestY) lowestY = y;
-            }
-          }
-        });
-
-        console.log("Najniższy punkt kubełka (lowestY):", lowestY);
-
-        const shadowY = shadowObject?.position?.y ?? 0;
-        let offsetY = highestY - lowestY + shadowY;
-
-        console.log("Przesunięcie kubełka (offsetY):", offsetY);
-
-        currentModelContainer.position.y = offsetY;
-      } else if (currentModelContainer) {
-        currentModelContainer.position.y = 0;
-      }
-
-    } catch (e) {
-      console.error('Błąd ładowania nóg:', e);
+      console.log(`Kubełek przesunięty o ${offset.toFixed(3)} (lowestY: ${lowestY.toFixed(3)}, legHeight: ${legHeight.toFixed(3)})`);
+    } else if (currentModelContainer) {
+      currentModelContainer.position.y = 0;
     }
+
+  } catch (e) {
+    console.error('Błąd ładowania nóg:', e);
   }
+}
+
+
 
   init();
 </script>
