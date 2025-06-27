@@ -3,6 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <title>Konfigurator krzeseł FK</title>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
   <script type="importmap">
     {
       "imports": {
@@ -13,12 +14,10 @@
   </script>
   <style>
     html, body {
-      margin: 0;
-      padding: 0;
-      width: 100%;
-      height: 100%;
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
       overflow: hidden;
-      font-family: sans-serif;
+      font-family: 'Poppins', sans-serif;
     }
     #app {
       display: flex;
@@ -32,32 +31,51 @@
     #sidebar {
       flex: 0 0 320px;
       background: white;
-      padding: 16px;
+      padding: 20px;
       overflow-y: auto;
       box-shadow: -2px 0 8px rgba(0,0,0,0.1);
       z-index: 1;
     }
-    #sidebar h2 { margin: 0 0 12px; font-size: 18px; }
-
+    #selected-chair-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
     #thumbnails, #legs-thumbnails {
       display: flex;
       flex-wrap: wrap;
       gap: 10px;
     }
-
     .thumbnail {
       width: 80px;
       height: 80px;
       object-fit: contain;
       cursor: pointer;
       border: 1px solid #ccc;
-      border-radius: 6px;
+      border-radius: 8px;
       transition: transform 0.2s, border-color 0.2s;
     }
-
     .thumbnail:hover {
-      transform: scale(1.1);
-      border-color: #333;
+      transform: scale(1.05);
+      border-color: #444;
+    }
+    
+  .thumbnail.selected {
+    outline: 2px solid #007bff;
+    border-radius: 6px;
+  }
+
+  #thumbnails img,
+  #legs-thumbnails img {
+    transition: outline 0.2s ease;
+    cursor: pointer;
+  }
+
+    hr {
+      border: none;
+      border-top: 1px solid #ccc;
+      margin: 16px 0 12px;
     }
   </style>
 </head>
@@ -65,189 +83,297 @@
   <div id="app">
     <canvas id="canvas"></canvas>
     <div id="sidebar">
-      <h2>Dostępne krzesła:</h2>
-      <div id="thumbnails"></div>
-      <div id="legs-thumbnails" style="display:none; margin-top:10px;"></div>
-    </div>
+      <div id="selected-chair-name">Wybrane krzesło: Brak</div>
+      <hr />
+      <!-- Sekcja miniatur krzeseł -->
+<div id="thumbnails"></div>
+
+<!-- Separator i miniaturki nóg -->
+<div id="legs-separator" style="display:none; margin:10px 0; border-top:1px solid #aaa;"></div>
+<div id="legs-thumbnails" style="display:none; flex-wrap: wrap; gap: 6px;"></div>
+
+<!-- Podsumowanie na dole sidebaru -->
+<div id="summary" style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-family: Arial, sans-serif; font-size: 14px; color: #333;"></div>
+
   </div>
 
   <script type="module">
-    import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
-    import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
+  import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
+  import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
-    let viewer;
-    let currentModelContainer = null;
-    let currentLegModel = null;
-    let shadowObject = null;
-    let globalSheetData = [];
-    let legsData = [];
+  let viewer;
+  let currentModelContainer = null;
+  let currentLegModel = null;
+  let shadowObject = null;
+  let globalSheetData = [];
+  let legsData = [];
+  let selectedChairThumbnail = null;
+  let selectedLegThumbnail = null;
+
+  // Przechowujemy aktualnie wybrane obiekty z danymi (do podsumowania)
+  let selectedChair = null;
+  let selectedLeg = null;
 
     async function init() {
-      const canvas = document.getElementById('canvas');
-      viewer = new ThreeViewer({
-        canvas,
-        plugins: [
-          LoadingScreenPlugin,
-          GBufferPlugin,
-          SSAAPlugin,
-          SSReflectionPlugin,
-          BloomPlugin
-        ],
-        rendererSettings: { antialias: true }
+    const canvas = document.getElementById('canvas');
+    viewer = new ThreeViewer({
+      canvas,
+      plugins: [
+        LoadingScreenPlugin,
+        GBufferPlugin,
+        SSAAPlugin,
+        SSReflectionPlugin,
+        BloomPlugin
+      ],
+      rendererSettings: { antialias: true }
+    });
+
+    resetCameraView();
+
+    try {
+      await viewer.setEnvironmentMap('hdr/old_apartments_walkway_1k.hdr', { isHDR: true });
+      const ssaa = viewer.getPlugin(SSAAPlugin);
+      if (ssaa) ssaa.setSampleLevel(6);
+    } catch (e) {
+      console.error("Błąd środowiska HDR:", e);
+    }
+
+    try {
+      const shadowModel = await viewer.load('chairs/Shadow.glb', {
+        autoCenter: false,
+        autoScale: false
       });
-
-      resetCameraView();
-
-      try {
-        await viewer.setEnvironmentMap('hdr/old_apartments_walkway_1k.hdr', { isHDR: true });
-        const ssaa = viewer.getPlugin(SSAAPlugin);
-        if (ssaa) ssaa.setSampleLevel(6);
-      } catch (e) {
-        console.error("Błąd środowiska HDR:", e);
-      }
-
-      try {
-        const shadowModel = await viewer.load('chairs/Shadow.glb', {
-          autoCenter: false,
-          autoScale: false
-        });
-        shadowObject = shadowModel;
-        viewer.scene.add(shadowObject);
-        shadowObject.name = "Shadow";
-      } catch (e) {
-        console.error("Błąd ładowania Shadow:", e);
-      }
-
-      window.addEventListener('resize', resizeCanvas);
-      resizeCanvas();
-      await loadDataFromSheet();
+      shadowObject = shadowModel;
+      viewer.scene.add(shadowObject);
+      shadowObject.name = "Shadow";
+    } catch (e) {
+      console.error("Błąd ładowania Shadow:", e);
     }
 
-    function resetCameraView() {
-      const cam = viewer.scene.activeCamera;
-      cam.position.set(-3.2, 1.4, 2);
-      cam.lookAt(0, 2, 0);
-      cam.near = 0.1;
-      cam.far = 1000;
-      cam.updateProjectionMatrix();
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    await loadDataFromSheet();
+  }
+
+  function resetCameraView() {
+    const cam = viewer.scene.activeCamera;
+    cam.position.set(-3.2, 1.4, 2);
+    cam.lookAt(0, 2, 0);
+    cam.near = 0.1;
+    cam.far = 1000;
+    cam.updateProjectionMatrix();
+  }
+
+  function resizeCanvas() {
+    const sidebarWidth = document.getElementById('sidebar').offsetWidth;
+    const w = window.innerWidth - sidebarWidth;
+    viewer.renderer.setSize(w, window.innerHeight);
+    const canvas = document.getElementById('canvas');
+    canvas.style.width = w + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    const cam = viewer.scene.activeCamera;
+    cam.aspect = w / window.innerHeight;
+    cam.updateProjectionMatrix();
+  }
+
+  async function setLegModel(variant) {
+    if (!currentModelContainer) return;
+
+    if (currentLegModel) {
+      viewer.scene.remove(currentLegModel);
+      currentLegModel.dispose?.();
+      currentLegModel = null;
     }
 
-    function resizeCanvas() {
-      const sidebarWidth = document.getElementById('sidebar').offsetWidth;
-      const w = window.innerWidth - sidebarWidth;
-      viewer.renderer.setSize(w, window.innerHeight);
-      const canvas = document.getElementById('canvas');
-      canvas.style.width = w + 'px';
-      canvas.style.height = window.innerHeight + 'px';
-      const cam = viewer.scene.activeCamera;
-      cam.aspect = w / window.innerHeight;
-      cam.updateProjectionMatrix();
-    }
-
-    async function setLegModel(variant) {
-      if (!currentModelContainer) return;
-
-      if (currentLegModel) {
-        viewer.scene.remove(currentLegModel);
-        currentLegModel.dispose?.();
-        currentLegModel = null;
-      }
-
+    try {
       currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb`, {
         autoCenter: true,
         autoScale: true
       });
-
       currentModelContainer.add(currentLegModel);
       currentLegModel.position.set(0, 0, 0);
-      viewer.scene.add(currentLegModel);
+
+      selectedLeg = variant;
+      updateSummary();
+
+    } catch (e) {
+      console.error("Błąd ładowania modelu nóg:", e);
+    }
+  }
+
+  async function loadModel(name) {
+    if (currentModelContainer) {
+      viewer.scene.remove(currentModelContainer);
+      currentModelContainer.dispose?.();
+      currentModelContainer = null;
+    }
+    if (currentLegModel) {
+      viewer.scene.remove(currentLegModel);
+      currentLegModel.dispose?.();
+      currentLegModel = null;
     }
 
-    async function loadModel(name) {
-      if (currentModelContainer) {
-        viewer.scene.remove(currentModelContainer);
-        currentModelContainer.dispose?.();
-        currentModelContainer = null;
-      }
-      if (currentLegModel) {
-        viewer.scene.remove(currentLegModel);
-        currentLegModel.dispose?.();
-        currentLegModel = null;
-      }
+    try {
+      const model = await viewer.load(`chairs/${name}.glb`, {
+        autoCenter: true,
+        autoScale: true
+      });
+      currentModelContainer = model;
+      viewer.scene.add(model);
 
-      try {
-        const model = await viewer.load(`chairs/${name}.glb`, {
-          autoCenter: true,
-          autoScale: true
-        });
-        currentModelContainer = model;
-        viewer.scene.add(model);
+      resetCameraView();
 
-        const chairData = globalSheetData.find(item => item.Nazwa === name);
-        const legsDiv = document.getElementById('legs-thumbnails');
-        if (chairData && chairData.Grupa === "kubełek") {
-          legsDiv.style.display = 'flex';
-          renderLegsThumbnails();
-        } else {
-          legsDiv.style.display = 'none';
-        }
-      } catch (e) {
-        console.error("Błąd ładowania modelu:", e);
-      }
-    }
-
-    function renderLegsThumbnails() {
+      const chairData = globalSheetData.find(item => item.Nazwa === name);
       const legsDiv = document.getElementById('legs-thumbnails');
-      legsDiv.innerHTML = '';
-      for (const leg of legsData) {
-        const img = document.createElement('img');
-        img.src = leg.Obrazek;
-        img.alt = leg.Nazwa || 'nogi';
-        img.title = leg.Nazwa || '';
-        img.className = 'thumbnail';
-        img.style.width = '60px';
-        img.style.height = '60px';
+      const separator = document.getElementById('legs-separator');
 
-        img.addEventListener('click', () => {
-          setLegModel(leg);
-        });
+      const label = document.getElementById('selected-chair-name');
+      label.textContent = "Wybrane krzesło: " + name;
 
-        legsDiv.appendChild(img);
+      selectedChair = chairData || null;
+      selectedLeg = null;
+      selectedLegThumbnail = null;
+      updateSummary();
+
+      if (chairData && chairData.Grupa === "kubełek") {
+        legsDiv.style.display = 'flex';
+        separator.style.display = 'block';
+        renderLegsThumbnails();
+      } else {
+        legsDiv.style.display = 'none';
+        separator.style.display = 'none';
       }
+
+    } catch (e) {
+      console.error("Błąd ładowania modelu:", e);
+    }
+  }
+
+  function renderLegsThumbnails() {
+  const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
+  legsThumbnailsDiv.innerHTML = '';
+
+  legsData.forEach(item => {
+    const wrapper = document.createElement('div');
+    wrapper.style.display = 'inline-block';
+    wrapper.style.marginRight = '6px';
+    wrapper.style.textAlign = 'center';
+
+    const img = document.createElement('img');
+    img.src = item.Obrazek;
+    img.alt = item.Nazwa || 'nogi';
+    img.title = item.Nazwa || '';
+    img.className = 'thumbnail';
+    img.style.width = '60px';
+    img.style.height = '60px';
+
+    img.addEventListener('click', () => {
+      applyLegVariant(item);
+      highlightSelectedThumbnail(img, legsThumbnailsDiv);
+    });
+
+    const caption = document.createElement('div');
+    caption.style.fontSize = '12px';
+    caption.style.marginTop = '2px';
+    caption.style.color = '#222';
+    caption.innerHTML = `
+      <strong>${item.Nazwa}</strong><br/>
+      <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
+    `;
+
+    wrapper.appendChild(img);
+    wrapper.appendChild(caption);
+    legsThumbnailsDiv.appendChild(wrapper);
+  });
+}
+
+
+  function highlightSelectedThumbnail(selectedImg, container) {
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    thumbnails.forEach(img => img.classList.remove('selected'));
+    selectedImg.classList.add('selected');
+    selectedChairThumbnail = selectedImg;
+  }
+
+ async function loadDataFromSheet() {
+  const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+  try {
+    const res = await fetch(sheetURL);
+    const data = await res.json();
+    globalSheetData = data;
+
+    const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
+    legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
+
+    const thumbnailsDiv = document.getElementById('thumbnails');
+    thumbnailsDiv.innerHTML = '';
+
+    for (const item of chairs) {
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'inline-block';
+      wrapper.style.marginRight = '6px';
+      wrapper.style.textAlign = 'center';
+
+      const img = document.createElement('img');
+      img.src = item.Obrazek;
+      img.alt = item.Nazwa || 'model';
+      img.title = item.Nazwa || '';
+      img.className = 'thumbnail';
+      img.style.width = '60px';
+      img.style.height = '60px';
+
+      img.addEventListener('click', async () => {
+        await loadModel(item.Nazwa);
+        highlightSelectedThumbnail(img, thumbnailsDiv);
+      });
+
+      const caption = document.createElement('div');
+      caption.style.fontSize = '12px';
+      caption.style.marginTop = '2px';
+      caption.style.color = '#222';
+      caption.innerHTML = `
+        <strong>${item.Nazwa}</strong><br/>
+        <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
+      `;
+
+      wrapper.appendChild(img);
+      wrapper.appendChild(caption);
+      thumbnailsDiv.appendChild(wrapper);
     }
 
-    async function loadDataFromSheet() {
-      const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
-      try {
-        const res = await fetch(sheetURL);
-        const data = await res.json();
-        globalSheetData = data;
-
-        const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
-        legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
-
-        const thumbnailsDiv = document.getElementById('thumbnails');
-        thumbnailsDiv.innerHTML = '';
-
-        for (const item of chairs) {
-          const img = document.createElement('img');
-          img.src = item.Obrazek;
-          img.alt = item.Nazwa || 'model';
-          img.title = item.Nazwa || '';
-          img.className = 'thumbnail';
-
-          img.addEventListener('click', async () => {
-            await loadModel(item.Nazwa);
-          });
-
-          thumbnailsDiv.appendChild(img);
-        }
-      } catch (e) {
-        console.error("Błąd pobierania danych z arkusza:", e);
-      }
+    if (chairs.length > 0) {
+      await loadModel(chairs[0].Nazwa);
+      highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
     }
+  } catch (e) {
+    console.error("Błąd pobierania danych z arkusza:", e);
+  }
+}
 
-    init();
-  </script>
+  function updateSummary() {
+    const summaryDiv = document.getElementById('summary');
+    if (!summaryDiv) return;
+
+    const chairName = selectedChair ? selectedChair.Nazwa : '-';
+    const chairPrice = selectedChair && selectedChair.Cena ? parseFloat(selectedChair.Cena) : 0;
+
+    const legName = selectedLeg ? selectedLeg.Nazwa : '-';
+    const legPrice = selectedLeg && selectedLeg.Cena ? parseFloat(selectedLeg.Cena) : 0;
+
+    const totalPrice = (chairPrice + legPrice).toFixed(2);
+
+    summaryDiv.innerHTML = `
+      <h3>Podsumowanie wyboru:</h3>
+      <p><strong>Krzesło:</strong> ${chairName} ${chairPrice ? `- ${chairPrice} PLN` : ''}</p>
+      <p><strong>Nogi:</strong> ${legName} ${legPrice ? `- ${legPrice} PLN` : ''}</p>
+      <hr/>
+      <p><strong>Razem:</strong> ${totalPrice} PLN</p>
+    `;
+  }
+
+  init();
+
+</script>
+
 </body>
 </html>
