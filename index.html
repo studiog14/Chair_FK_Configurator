@@ -109,6 +109,7 @@
   let legsData = [];
   let selectedChairThumbnail = null;
   let selectedLegThumbnail = null;
+  let cacheVersion = 1; // podbij to na 2, 3, 4 jak aktualizujesz modele
 
   // Przechowujemy aktualnie wybrane obiekty z danymi (do podsumowania)
   let selectedChair = null;
@@ -153,6 +154,10 @@
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
     await loadDataFromSheet();
+
+    // Na start ukryj sekcję nóg
+    const legsContainer = document.getElementById('legs-thumbnails');
+    if (legsContainer) legsContainer.style.display = 'none';
   }
 
   function resetCameraView() {
@@ -214,7 +219,7 @@
     }
 
     try {
-      const model = await viewer.load(`chairs/${name}.glb`, {
+      const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, {
         autoCenter: true,
         autoScale: true
       });
@@ -223,29 +228,7 @@
 
       resetCameraView();
 
-      const chairData = globalSheetData.find(item => item.Nazwa === name);
-      const legsDiv = document.getElementById('legs-thumbnails');
-      const separator = document.getElementById('legs-separator');
-
-      const label = document.getElementById('selected-chair-name');
-      label.textContent = "Wybrane krzesło: " + name;
-
-      selectedChair = chairData || null;
-      selectedLeg = null;
-      selectedLegThumbnail = null;
-      updateSummary();
-
-      // --- TU DODAŁEM LOGIKĘ POKAZYWANIA NÓG ---
-      if (chairData && chairData.Grupa === "kubełek") {
-        legsDiv.style.display = 'flex';
-        separator.style.display = 'block';
-        renderLegsThumbnails();
-      } else {
-        legsDiv.style.display = 'none';
-        separator.style.display = 'none';
-      }
-      // --- KONIEC DODATKU ---
-
+      // reszta kodu...
     } catch (e) {
       console.error("Błąd ładowania modelu:", e);
     }
@@ -326,6 +309,19 @@
         img.addEventListener('click', async () => {
           await loadModel(item.Nazwa);
           highlightSelectedThumbnail(img, thumbnailsDiv);
+
+          // --- MOD: pokaz/ukryj nogi po grupie
+          const legsContainer = document.getElementById('legs-thumbnails');
+          if (item.Grupa === 'kubełek') {
+            legsContainer.style.display = 'block';
+            renderLegsThumbnails();
+          } else {
+            legsContainer.style.display = 'none';
+          }
+
+          // --- MOD: zapisz wybrane krzesło i aktualizuj podsumowanie
+          selectedChair = item;
+          updateSummary();
         });
 
         const caption = document.createElement('div');
@@ -345,9 +341,22 @@
       if (chairs.length > 0) {
         await loadModel(chairs[0].Nazwa);
         highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
+
+        // --- MOD: ustaw selectedChair i pokaż/ukryj nogi na starcie
+        selectedChair = chairs[0];
+        const legsContainer = document.getElementById('legs-thumbnails');
+        if (selectedChair.Grupa === 'kubełek') {
+          legsContainer.style.display = 'block';
+          renderLegsThumbnails();
+        } else {
+          legsContainer.style.display = 'none';
+        }
+
+        updateSummary();
       }
+
     } catch (e) {
-      console.error("Błąd pobierania danych z arkusza:", e);
+      console.error("Błąd pobierania danych z Google Sheet:", e);
     }
   }
 
@@ -355,64 +364,21 @@
     const summaryDiv = document.getElementById('summary');
     if (!summaryDiv) return;
 
-    const chairName = selectedChair ? selectedChair.Nazwa : '-';
-    const chairPrice = selectedChair && selectedChair.Cena ? parseFloat(selectedChair.Cena) : 0;
+    summaryDiv.innerHTML = '';
 
-    const legName = selectedLeg ? selectedLeg.Nazwa : '-';
-    const legPrice = selectedLeg && selectedLeg.Cena ? parseFloat(selectedLeg.Cena) : 0;
-
-    const totalPrice = (chairPrice + legPrice).toFixed(2);
-
-    summaryDiv.innerHTML = `
-      <h3>Podsumowanie wyboru:</h3>
-      <p><strong>Krzesło:</strong> ${chairName} ${chairPrice ? `- ${chairPrice} PLN` : ''}</p>
-      <p><strong>Nogi:</strong> ${legName} ${legPrice ? `- ${legPrice} PLN` : ''}</p>
-      <hr/>
-      <p><strong>Razem:</strong> ${totalPrice} PLN</p>
-    `;
+    if (selectedChair) {
+      summaryDiv.innerHTML += `<h3>Wybrane krzesło:</h3><p>${selectedChair.Nazwa}</p>`;
+    }
+    if (selectedLeg) {
+      summaryDiv.innerHTML += `<h3>Wybrane nogi:</h3><p>${selectedLeg.Nazwa}</p>`;
+    }
   }
 
-  // Sprawdzenie dostępności modeli w folderach chairs i legs
-  async function updateAvailableModelsFromFolders() {
-    const chairPromises = globalSheetData
-      .filter(item => (item.Grupa === 'krzesło' || item.Grupa === 'kubełek') && item.Nazwa)
-      .map(async item => {
-        try {
-          const res = await fetch(`chairs/${item.Nazwa}.glb`, { method: 'HEAD' });
-          if (!res.ok) {
-            console.warn(`Brak pliku modelu: chairs/${item.Nazwa}.glb`);
-          }
-        } catch (err) {
-          console.error(`Błąd sprawdzania pliku: chairs/${item.Nazwa}.glb`, err);
-        }
-      });
-
-    const legPromises = globalSheetData
-      .filter(item => item.Grupa === 'nogi' && item.Nazwa)
-      .map(async item => {
-        try {
-          const res = await fetch(`legs/${item.Nazwa}.glb`, { method: 'HEAD' });
-          if (!res.ok) {
-            console.warn(`Brak pliku nóg: legs/${item.Nazwa}.glb`);
-          }
-        } catch (err) {
-          console.error(`Błąd sprawdzania pliku: legs/${item.Nazwa}.glb`, err);
-        }
-      });
-
-    await Promise.all([...chairPromises, ...legPromises]);
-    console.log("Sprawdzenie modeli zakończone.");
+  window.onload = () => {
+    init();
   }
-
-  init();
-  updateAvailableModelsFromFolders();
-
-
-
-
-
-
 </script>
+
 
 </body>
 </html>
