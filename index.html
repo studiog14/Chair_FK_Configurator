@@ -193,72 +193,78 @@
 
   try {
     currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
-      autoCenter: true,
+      autoCenter: false,
       autoScale: true
     });
+
+    // Pobierz bounding box nóg
+    const legsBox = new THREE.Box3().setFromObject(currentLegModel);
+    const legsHeight = legsBox.max.y - legsBox.min.y;
+
+    // Ustaw nogi na wysokości 0 (podłoża)
+    currentLegModel.position.y = -legsBox.min.y;
+
+    // Podnieś kubełek o wysokość nóg
+    const box = new THREE.Box3().setFromObject(currentModelContainer);
+    const bucketYOffset = legsHeight;
+
+    currentModelContainer.position.y = 0; // reset pozycji kontenera
+
+    // Załóżmy, kubełek jest pierwszy child
+    if (currentModelContainer.children.length > 0) {
+      const bucket = currentModelContainer.children[0];
+      bucket.position.y = bucketYOffset;
+    }
+
+    // Dodaj nogi do kontenera (na dole)
     currentModelContainer.add(currentLegModel);
-    // jeśli wybrano nogi z wysokością
-if (variant.height) {
-  // pobierz wartość w metrach
-  const offset = parseFloat(variant.height);
-  // teraz podnieś kubełek (który jest aktualnie ładowany)
-  if (currentModelContainer.children.length > 0) {
-    // zakładam, że kubełek to pierwszy child
-    const chair = currentModelContainer.children[0];
-    chair.position.y = offset;
-  }
-}
-
-    const baseHeight = 0.4; // 0.4 metra = 40 cm // wpisz tutaj bazową wysokość nóg w modelu Blender
-    const scaleValue = variant.height ? parseFloat(variant.height) / baseHeight : 1.0;
-    currentLegModel.scale.set(scaleValue, scaleValue, scaleValue);
-    // --- PODNOSZENIE KUBEŁKA o wysokość nóg z arkusza ---
-if (variant.height) {
-  const legHeight = parseFloat(variant.height); // np. 0.42 metra
-  currentModelContainer.position.y = legHeight;
-} else {
-  currentModelContainer.position.y = 0; // domyślna pozycja
-}
-
-
-    // Jeśli trzeba, popraw też pozycję nóg względem kubełka:
-    currentLegModel.position.set(0, 0, 0);
 
     selectedLeg = variant;
     updateSummary();
+
+    resetCameraView();  // <-- TU DODAJ reset kamery po dodaniu nóg!
 
   } catch (e) {
     console.error("Błąd ładowania modelu nóg:", e);
   }
 }
 
+
+
   async function loadModel(name) {
-    if (currentModelContainer) {
-      viewer.scene.remove(currentModelContainer);
-      currentModelContainer.dispose?.();
-      currentModelContainer = null;
-    }
-    if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
-      currentLegModel.dispose?.();
-      currentLegModel = null;
-    }
-
-    try {
-      const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, {
-        autoCenter: true,
-        autoScale: true
-      });
-      currentModelContainer = model;
-      viewer.scene.add(model);
-
-      resetCameraView();
-
-      // reszta kodu...
-    } catch (e) {
-      console.error("Błąd ładowania modelu:", e);
-    }
+  if (currentModelContainer) {
+    viewer.scene.remove(currentModelContainer);
+    currentModelContainer.dispose?.();
+    currentModelContainer = null;
   }
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+    currentLegModel.dispose?.();
+    currentLegModel = null;
+  }
+
+  try {
+    const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, {
+      autoCenter: false,   // <-- wyłącz autoCenter
+      autoScale: true
+    });
+
+    currentModelContainer = model;
+
+    // Ręcznie ustawiamy Y = 0 na podstawie dolnej granicy modelu
+    const box = new THREE.Box3().setFromObject(model);
+    const yOffset = box.min.y;
+
+    model.position.y = -yOffset; // podnieś model, by spoczywał na Y=0
+
+    viewer.scene.add(model);
+    resetCameraView();
+
+  } catch (e) {
+    console.error("Błąd ładowania modelu:", e);
+  }
+}
+
 
   function renderLegsThumbnails() {
     const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
