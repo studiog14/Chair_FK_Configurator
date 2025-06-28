@@ -200,6 +200,14 @@
     const baseHeight = 0.4; // 0.4 metra = 40 cm // wpisz tutaj bazową wysokość nóg w modelu Blender
     const scaleValue = variant.height ? parseFloat(variant.height) / baseHeight : 1.0;
     currentLegModel.scale.set(scaleValue, scaleValue, scaleValue);
+    // --- PODNOSZENIE KUBEŁKA o wysokość nóg z arkusza ---
+if (variant.height) {
+  const legHeight = parseFloat(variant.height); // np. 0.42 metra
+  currentModelContainer.position.y = legHeight;
+} else {
+  currentModelContainer.position.y = 0; // domyślna pozycja
+}
+
 
     // Jeśli trzeba, popraw też pozycję nóg względem kubełka:
     currentLegModel.position.set(0, 0, 0);
