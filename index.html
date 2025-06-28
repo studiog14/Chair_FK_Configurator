@@ -372,7 +372,42 @@
     `;
   }
 
+  // Sprawdzenie dostępności modeli w folderach chairs i legs
+  async function updateAvailableModelsFromFolders() {
+    const chairPromises = globalSheetData
+      .filter(item => (item.Grupa === 'krzesło' || item.Grupa === 'kubełek') && item.Nazwa)
+      .map(async item => {
+        try {
+          const res = await fetch(`chairs/${item.Nazwa}.glb`, { method: 'HEAD' });
+          if (!res.ok) {
+            console.warn(`Brak pliku modelu: chairs/${item.Nazwa}.glb`);
+          }
+        } catch (err) {
+          console.error(`Błąd sprawdzania pliku: chairs/${item.Nazwa}.glb`, err);
+        }
+      });
+
+    const legPromises = globalSheetData
+      .filter(item => item.Grupa === 'nogi' && item.Nazwa)
+      .map(async item => {
+        try {
+          const res = await fetch(`legs/${item.Nazwa}.glb`, { method: 'HEAD' });
+          if (!res.ok) {
+            console.warn(`Brak pliku nóg: legs/${item.Nazwa}.glb`);
+          }
+        } catch (err) {
+          console.error(`Błąd sprawdzania pliku: legs/${item.Nazwa}.glb`, err);
+        }
+      });
+
+    await Promise.all([...chairPromises, ...legPromises]);
+    console.log("Sprawdzenie modeli zakończone.");
+  }
+
   init();
+  updateAvailableModelsFromFolders();
+
+
 
 
 
