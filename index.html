@@ -110,6 +110,7 @@
   let selectedChairThumbnail = null;
   let selectedLegThumbnail = null;
   let cacheVersion = 1; // podbij to na 2, 3, 4 jak aktualizujesz modele
+  let bucketContainer = null; // <--- DODAJ TO
 
   // Przechowujemy aktualnie wybrane obiekty z danymi (do podsumowania)
   let selectedChair = null;
@@ -196,6 +197,17 @@
       autoScale: true
     });
     currentModelContainer.add(currentLegModel);
+    // jeśli wybrano nogi z wysokością
+if (variant.height) {
+  // pobierz wartość w metrach
+  const offset = parseFloat(variant.height);
+  // teraz podnieś kubełek (który jest aktualnie ładowany)
+  if (currentModelContainer.children.length > 0) {
+    // zakładam, że kubełek to pierwszy child
+    const chair = currentModelContainer.children[0];
+    chair.position.y = offset;
+  }
+}
 
     const baseHeight = 0.4; // 0.4 metra = 40 cm // wpisz tutaj bazową wysokość nóg w modelu Blender
     const scaleValue = variant.height ? parseFloat(variant.height) / baseHeight : 1.0;
