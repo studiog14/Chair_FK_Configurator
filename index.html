@@ -182,36 +182,35 @@
   }
 
   async function setLegModel(variant) {
-    if (!currentModelContainer) return;
+  if (!currentModelContainer) return;
 
-    if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
-      currentLegModel.dispose?.();
-      currentLegModel = null;
-    }
-
-    try {
-      currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb`, {
-        autoCenter: true,
-        autoScale: true
-      });
-      currentModelContainer.add(currentLegModel);
-      currentLegModel.position.set(0, 0, 0);
-      // Przykładowe ustawienia skali i pozycji nóg
-const legScale = 0.5;   // zmień na np. 0.45 lub 0.55, żeby dopasować
-currentLegModel.scale.set(legScale, legScale, legScale);
-
-// Delikatne przesunięcie nóg w pionie (dopasuj jeśli trzeba)
-currentLegModel.position.set(0, -0.05, 0);
-
-
-      selectedLeg = variant;
-      updateSummary();
-
-    } catch (e) {
-      console.error("Błąd ładowania modelu nóg:", e);
-    }
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+    currentLegModel.dispose?.();
+    currentLegModel = null;
   }
+
+  try {
+    currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
+      autoCenter: true,
+      autoScale: true
+    });
+    currentModelContainer.add(currentLegModel);
+
+    const baseHeight = 0.4; // 0.4 metra = 40 cm // wpisz tutaj bazową wysokość nóg w modelu Blender
+    const scaleValue = variant.height ? parseFloat(variant.height) / baseHeight : 1.0;
+    currentLegModel.scale.set(scaleValue, scaleValue, scaleValue);
+
+    // Jeśli trzeba, popraw też pozycję nóg względem kubełka:
+    currentLegModel.position.set(0, 0, 0);
+
+    selectedLeg = variant;
+    updateSummary();
+
+  } catch (e) {
+    console.error("Błąd ładowania modelu nóg:", e);
+  }
+}
 
   async function loadModel(name) {
     if (currentModelContainer) {
