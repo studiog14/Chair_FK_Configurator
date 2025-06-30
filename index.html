@@ -102,15 +102,14 @@
   import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
   let viewer;
-  let currentModelContainer = null;
-  let currentLegModel = null;
+  let currentModelContainer = null; // Będzie zawierać kubełek lub całe krzesło
+  let currentLegModel = null; // Będzie zawierać tylko nogi
   let shadowObject = null;
   let globalSheetData = [];
   let legsData = [];
   let selectedChairThumbnail = null;
   let selectedLegThumbnail = null;
   let cacheVersion = 1; // podbij to na 2, 3, 4 jak aktualizujesz modele
-  let bucketContainer = null; // <--- DODAJ TO
 
   // Przechowujemy aktualnie wybrane obiekty z danymi (do podsumowania)
   let selectedChair = null;
@@ -130,6 +129,7 @@
       rendererSettings: { antialias: true }
     });
 
+    // Ustawienie początkowej pozycji kamery
     resetCameraView();
 
     try {
@@ -137,19 +137,20 @@
       const ssaa = viewer.getPlugin(SSAAPlugin);
       if (ssaa) ssaa.setSampleLevel(6);
     } catch (e) {
-      console.error("Błąd środowiska HDR:", e);
+      console.error("Błąd ładowania środowiska HDR:", e);
     }
 
     try {
+      // Ładowanie obiektu cienia (przyjmujemy, że jest statyczny)
       const shadowModel = await viewer.load('chairs/Shadow.glb', {
-        autoCenter: false,
-        autoScale: false
+        autoCenter: false, // Nie centruj cienia
+        autoScale: false   // Nie skaluj cienia
       });
       shadowObject = shadowModel;
       viewer.scene.add(shadowObject);
       shadowObject.name = "Shadow";
     } catch (e) {
-      console.error("Błąd ładowania Shadow:", e);
+      console.error("Błąd ładowania modelu Shadow:", e);
     }
 
     window.addEventListener('resize', resizeCanvas);
@@ -159,17 +160,24 @@
     // Na start ukryj sekcję nóg
     const legsContainer = document.getElementById('legs-thumbnails');
     if (legsContainer) legsContainer.style.display = 'none';
+    const legsSeparator = document.getElementById('legs-separator');
+    if (legsSeparator) legsSeparator.style.display = 'none';
   }
 
+  // Funkcja do resetowania widoku kamery do domyślnych wartości
   function resetCameraView() {
     const cam = viewer.scene.activeCamera;
     cam.position.set(-3.2, 1.4, 2);
-    cam.lookAt(0, 2, 0);
+    cam.lookAt(0, 2, 0); // Cel kamery - środek krzesła
     cam.near = 0.1;
     cam.far = 1000;
     cam.updateProjectionMatrix();
+    if (viewer.controls && typeof viewer.controls.reset === 'function') {
+      viewer.controls.reset();
+    }
   }
 
+  // Funkcja do dostosowywania rozmiaru płótna po zmianie rozmiaru okna
   function resizeCanvas() {
     const sidebarWidth = document.getElementById('sidebar').offsetWidth;
     const w = window.innerWidth - sidebarWidth;
@@ -182,103 +190,141 @@
     cam.updateProjectionMatrix();
   }
 
+  // Funkcja do ładowania i wyświetlania modelu nóg
   async function setLegModel(variant) {
-  if (!currentModelContainer) return; // Upewnij się, że kubełek jest już załadowany
-
-  if (currentLegModel) {
-    viewer.scene.remove(currentLegModel);
-    currentLegModel.dispose?.();
-    currentLegModel = null;
-  }
-
-  try {
-    currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
-      autoCenter: false, // Pozostawiamy false, aby móc precyzyjnie pozycjonować nogi
-      autoScale: false   // KLUCZOWA ZMIANA: Pozostawiamy false. Będą dziedziczyć skalę od kubełka.
-    });
-
-    // --- KLUCZOWA ZMIANA: USUŃ CAŁY TEN BLOK KODU Z RĘCZNYM SKALOWANIEM NÓG ---
-    // const initialLegBoundingBox = currentLegModel.getBounds().box;
-    // const originalLegModelHeight = initialLegBoundingBox.max.y - initialLegBoundingBox.min.y;
-    // const desiredLegHeight = variant.height ? parseFloat(variant.height) : originalLegModelHeight;
-    // if (originalLegModelHeight > 0.0001) {
-    //   const scaleFactor = desiredLegHeight / originalLegModelHeight;
-    //   currentLegModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-    // } else {
-    //   console.warn(`Original leg model height for ${variant.Nazwa} is zero, cannot scale.`);
-    // }
-    // -------------------------------------------------------------------------
-
-    // Dodaj nogi jako dziecko kontenera kubełka.
-    // Dzięki temu nogi automatycznie odziedziczą skalę kubełka.
-    currentModelContainer.add(currentLegModel);
-
-    // Pozycjonowanie nóg względem kubełka.
-    // Zakładając, że:
-    // 1. Kubełek ma swój origin w miejscu styku z nogami (na dole).
-    // 2. Nogi mają swój origin w miejscu styku z kubełkiem (na górze).
-    // Wtedy lokalne (0,0,0) jest idealnym miejscem na połączenie.
-    currentLegModel.position.set(0, 0, 0);
-
-    // Podnieś cały zestaw (kubełek + nogi) tak, aby stopy nóg były na Y=0 świata.
-    // `variant.height` powinien teraz reprezentować faktyczną wysokość nóg (od ziemi do miejsca styku z kubełkiem)
-    // w jednostkach świata, które odpowiadają auto-skalowanej scenie.
-    const legHeight = variant.height ? parseFloat(variant.height) : 0; // Upewnij się, że masz domyślną wysokość, jeśli brak
-    currentModelContainer.position.y = legHeight;
-
-    // Dopasowanie kamery do nowego, połączonego modelu
-    if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
-      viewer.controls.fitTo(currentModelContainer, true);
-    } else {
-      resetCameraView();
+    if (!currentModelContainer) {
+      console.warn("Nie wybrano kubełka krzesła. Nie można dodać nóg.");
+      return;
     }
 
-    selectedLeg = variant;
-    updateSummary();
-
-  } catch (e) {
-    console.error("Błąd ładowania modelu nóg:", e);
-  }
-}
-  
-
-  
-
-
-  async function loadModel(name) {
-    if (currentModelContainer) {
-      viewer.scene.remove(currentModelContainer);
-      currentModelContainer.dispose?.();
-      currentModelContainer = null;
-    }
+    // Usuń poprzednie nogi, jeśli istnieją
     if (currentLegModel) {
-      viewer.scene.remove(currentLegModel);
-      currentLegModel.dispose?.();
+      // Sprawdź, czy nogi są dzieckiem currentModelContainer
+      if (currentModelContainer.children.includes(currentLegModel.object3D || currentLegModel)) {
+          currentModelContainer.remove(currentLegModel.object3D || currentLegModel);
+      } else {
+          // Jeśli nie są, to muszą być w scenie (mniej prawdopodobne, ale na wszelki wypadek)
+          viewer.scene.remove(currentLegModel);
+      }
+      currentLegModel.dispose?.(); // Zwolnij zasoby
       currentLegModel = null;
     }
 
     try {
-      const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, {
-        autoCenter: true,
-        autoScale: true
+      // Załaduj model nóg bez autoCenter i autoScale, aby zachować ich oryginalne wymiary z Blendera
+      const newLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
+        autoCenter: false, // Nie centruj automatycznie
+        autoScale: false   // Nie skaluj automatycznie
       });
-      currentModelContainer = model;
+      currentLegModel = newLegModel;
+
+      // 1. Oblicz oryginalną wysokość modelu nóg w jego lokalnym układzie (z Blendera)
+      const originalLegNativeBounds = currentLegModel.getBounds().box;
+      const originalLegModelHeight = originalLegNativeBounds.max.y - originalLegNativeBounds.min.y;
+
+      // 2. Oblicz współczynnik skalowania, który został zastosowany do kubełka (currentModelContainer)
+      // Nogi odziedziczą ten współczynnik od rodzica.
+      const kubelekScaleFactor = currentModelContainer.scale.y;
+
+      // 3. Określ docelową wysokość nóg w jednostkach świata (z danych arkusza)
+      // Jeśli variant.height jest puste lub 0, użyj oryginalnej wysokości modelu jako domyślnej
+      const desiredLegHeightWorld = variant.height ? parseFloat(variant.height) : originalLegModelHeight * kubelekScaleFactor; // Domyślna wysokość *po dziedziczeniu*
+
+      // 4. Oblicz *lokalną* skalę, którą musimy zastosować do `currentLegModel`,
+      // aby po odziedziczeniu skali rodzica, jego finalna wysokość w świecie była `desiredLegHeightWorld`.
+      let localScaleForLegs = 1;
+      if (originalLegModelHeight > 0.0001 && kubelekScaleFactor > 0.0001) {
+        // desiredLegHeightWorld = (originalLegModelHeight * localScaleForLegs) * kubelekScaleFactor
+        localScaleForLegs = desiredLegHeightWorld / (originalLegModelHeight * kubelekScaleFactor);
+      } else {
+        console.warn(`Błąd: Oryginalna wysokość modelu nóg (${originalLegModelHeight}) lub skala kubełka (${kubelekScaleFactor}) jest zerowa. Nie można precyzyjnie przeskalować nóg.`);
+      }
+      currentLegModel.scale.set(localScaleForLegs, localScaleForLegs, localScaleForLegs);
+
+      // Dodaj nogi jako dziecko kontenera kubełka.
+      // W tym momencie `currentLegModel` ma już zastosowaną skalę lokalną,
+      // a dodatkowo odziedziczy skalę od `currentModelContainer`.
+      currentModelContainer.add(currentLegModel);
+
+      // 5. Pozycjonowanie nóg względem kubełka:
+      // Zakładamy, że zarówno kubełek, jak i nogi mają swoje punkty początkowe (origins) na samym dole.
+      // Kubełek jest już ustawiony tak, że jego dół jest na Y=0 (dzięki autoCenter: false w loadModel).
+      // Aby nogi znalazły się *pod* kubełkiem, musimy przesunąć je w dół o ich *rzeczywistą, zeskalowaną lokalnie wysokość*.
+      const finalLegLocalBounds = currentLegModel.getBounds().box; // Granice modelu nóg PO zastosowaniu localScaleForLegs
+      const actualScaledLegHeightLocal = finalLegLocalBounds.max.y - finalLegLocalBounds.min.y;
+
+      // Ustawienie pozycji Y tak, aby szczyt nóg znajdował się na Y=0 w lokalnym układzie kubełka.
+      // Ponieważ origin nóg jest na ich dole, przesuwamy je o całą ich wysokość w dół.
+      currentLegModel.position.set(0, -actualScaledLegHeightLocal, 0);
+
+      // Kubełek (currentModelContainer) już ma swój dół na Y=0 świata.
+      // Nogi są teraz pod nim i również stykają się z Y=0.
+      // Nie musimy już zmieniać currentModelContainer.position.y.
+
+      // Dopasowanie kamery do nowego, połączonego modelu
+      if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
+        viewer.controls.fitTo(currentModelContainer, true);
+      } else {
+        resetCameraView();
+      }
+
+      selectedLeg = variant;
+      updateSummary();
+
+    } catch (e) {
+      console.error("Błąd ładowania modelu nóg:", e);
+    }
+  }
+
+  // Funkcja do ładowania i wyświetlania modelu krzesła/kubełka
+  async function loadModel(name, group) { // Dodany parametr 'group'
+    // Usuń poprzedni model krzesła/kubełka
+    if (currentModelContainer) {
+      viewer.scene.remove(currentModelContainer);
+      currentModelContainer.dispose?.(); // Zwolnij zasoby
+      currentModelContainer = null;
+    }
+    // Usuń poprzedni model nóg (jeśli były dodane do poprzedniego kubełka)
+    if (currentLegModel) {
+      // Sprawdź, czy nogi były dzieckiem currentModelContainer
+      if (currentModelContainer && (currentModelContainer.children.includes(currentLegModel.object3D || currentLegModel))) {
+          currentModelContainer.remove(currentLegModel.object3D || currentLegModel);
+      } else {
+          // Jeśli nie były, to muszą być w scenie (np. jeśli wybrano krzesło zamiast kubełka z nogami)
+          viewer.scene.remove(currentLegModel);
+      }
+      currentLegModel.dispose?.(); // Zwolnij zasoby
+      currentLegModel = null;
+    }
+
+    try {
+      const loadOptions = {};
+      if (group === 'kubełek') {
+        // Dla kubełka: Nie centruj (aby jego dół był na Y=0), ale skaluj automatycznie
+        loadOptions.autoCenter = false;
+        loadOptions.autoScale = true;
+      } else { // group === 'krzesło'
+        // Dla całego krzesła: Centruj i skaluj automatycznie
+        loadOptions.autoCenter = true;
+        loadOptions.autoScale = true;
+      }
+
+      const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, loadOptions);
+      currentModelContainer = model; // Przypisz załadowany model do kontenera
       viewer.scene.add(model);
 
-// Zamień resetCameraView() na:
-if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
-  viewer.controls.fitTo(model, true);
-} else {
-  resetCameraView(); // na wszelki wypadek zostaw fallback
-}
-
-
-      // reszta kodu...
+      // Dopasowanie kamery do nowego modelu
+      if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
+        viewer.controls.fitTo(model, true);
+      } else {
+        resetCameraView();
+      }
     } catch (e) {
       console.error("Błąd ładowania modelu:", e);
     }
   }
 
+  // Funkcja do renderowania miniatur nóg
   function renderLegsThumbnails() {
     const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
     legsThumbnailsDiv.innerHTML = '';
@@ -300,6 +346,7 @@ if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
       img.addEventListener('click', () => {
         setLegModel(item);
         highlightSelectedThumbnail(img, legsThumbnailsDiv);
+        selectedLegThumbnail = img; // Zaktualizuj selectedLegThumbnail
       });
 
       const caption = document.createElement('div');
@@ -317,13 +364,14 @@ if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
     });
   }
 
+  // Funkcja do podświetlania wybranej miniaturki
   function highlightSelectedThumbnail(selectedImg, container) {
     const thumbnails = container.querySelectorAll('.thumbnail');
     thumbnails.forEach(img => img.classList.remove('selected'));
     selectedImg.classList.add('selected');
-    selectedChairThumbnail = selectedImg;
   }
 
+  // Funkcja do ładowania danych z arkusza Google Sheet
   async function loadDataFromSheet() {
     const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
     try {
@@ -352,19 +400,32 @@ if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
         img.style.height = '60px';
 
         img.addEventListener('click', async () => {
-          await loadModel(item.Nazwa);
+          await loadModel(item.Nazwa, item.Grupa); // Przekaż grupę do loadModel
           highlightSelectedThumbnail(img, thumbnailsDiv);
+          selectedChairThumbnail = img; // Zaktualizuj selectedChairThumbnail
 
-          // --- MOD: pokaz/ukryj nogi po grupie
+          // Pokaż/ukryj sekcję nóg w zależności od grupy wybranego elementu
           const legsContainer = document.getElementById('legs-thumbnails');
+          const legsSeparator = document.getElementById('legs-separator');
           if (item.Grupa === 'kubełek') {
             legsContainer.style.display = 'block';
+            legsSeparator.style.display = 'block';
             renderLegsThumbnails();
           } else {
             legsContainer.style.display = 'none';
+            legsSeparator.style.display = 'none';
+            // Jeśli zmieniono na całe krzesło, usuń wybrane nogi
+            if (currentLegModel) {
+                viewer.scene.remove(currentLegModel);
+                currentLegModel.dispose?.();
+                currentLegModel = null;
+            }
+            selectedLeg = null; // Zresetuj wybrane nogi
+            if(selectedLegThumbnail) selectedLegThumbnail.classList.remove('selected'); // Odznacz miniaturkę nóg
+            selectedLegThumbnail = null;
           }
 
-          // --- MOD: zapisz wybrane krzesło i aktualizuj podsumowanie
+          // Zapisz wybrane krzesło i aktualizuj podsumowanie
           selectedChair = item;
           updateSummary();
         });
@@ -383,18 +444,23 @@ if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
         thumbnailsDiv.appendChild(wrapper);
       }
 
+      // Załaduj pierwsze krzesło/kubełek na starcie
       if (chairs.length > 0) {
-        await loadModel(chairs[0].Nazwa);
+        await loadModel(chairs[0].Nazwa, chairs[0].Grupa); // Przekaż grupę do loadModel
         highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
+        selectedChairThumbnail = thumbnailsDiv.querySelector('.thumbnail');
 
-        // --- MOD: ustaw selectedChair i pokaż/ukryj nogi na starcie
+        // Ustaw selectedChair i pokaż/ukryj nogi na starcie
         selectedChair = chairs[0];
         const legsContainer = document.getElementById('legs-thumbnails');
+        const legsSeparator = document.getElementById('legs-separator');
         if (selectedChair.Grupa === 'kubełek') {
           legsContainer.style.display = 'block';
+          legsSeparator.style.display = 'block';
           renderLegsThumbnails();
         } else {
           legsContainer.style.display = 'none';
+          legsSeparator.style.display = 'none';
         }
 
         updateSummary();
@@ -405,29 +471,37 @@ if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
     }
   }
 
+  // Funkcja do aktualizowania podsumowania wyboru
   function updateSummary() {
     const summaryDiv = document.getElementById('summary');
     if (!summaryDiv) return;
 
     summaryDiv.innerHTML = '';
+    let totalPrice = 0;
 
     if (selectedChair) {
-      summaryDiv.innerHTML += `<h3>Wybrane krzesło:</h3><p>${selectedChair.Nazwa}</p>`;
+      summaryDiv.innerHTML += `<h3>Krzesło:</h3><p>${selectedChair.Nazwa} ${selectedChair.Cena ? `(${selectedChair.Cena} PLN)` : ''}</p>`;
+      if (selectedChair.Cena) totalPrice += parseFloat(selectedChair.Cena);
     }
     if (selectedLeg) {
-      summaryDiv.innerHTML += `<h3>Wybrane nogi:</h3><p>${selectedLeg.Nazwa}</p>`;
+      summaryDiv.innerHTML += `<h3>Nogi:</h3><p>${selectedLeg.Nazwa} ${selectedLeg.Cena ? `(${selectedLeg.Cena} PLN)` : ''}</p>`;
+      if (selectedLeg.Cena) totalPrice += parseFloat(selectedLeg.Cena);
+    }
+
+    if (selectedChair || selectedLeg) {
+        summaryDiv.innerHTML += `<h3>Suma:</h3><p><strong>${totalPrice.toFixed(2)} PLN</strong></p>`;
+    } else {
+        summaryDiv.innerHTML += `<p>Wybierz elementy, aby zobaczyć podsumowanie.</p>`;
+    }
+
+    const selectedChairNameDiv = document.getElementById('selected-chair-name');
+    if (selectedChairNameDiv) {
+        selectedChairNameDiv.textContent = `Wybrane krzesło: ${selectedChair ? selectedChair.Nazwa : 'Brak'}`;
     }
   }
   
-
+  // Inicjalizacja po załadowaniu okna
   window.onload = () => {
-
-    function resetCameraView() {
-  if (viewer && viewer.controls && typeof viewer.controls.reset === 'function') {
-    viewer.controls.reset();
-  }
-}
-
     init();
   }
 </script>
