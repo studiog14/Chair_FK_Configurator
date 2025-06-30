@@ -13,7 +13,79 @@
     }
   </script>
   <style>
-    /* ... reszta twojego CSS ... */
+    html, body {
+      margin: 0; padding: 0;
+      width: 100%; height: 100%;
+      overflow: hidden;
+      font-family: 'Poppins', sans-serif;
+    }
+    #app {
+      display: flex;
+      height: 100vh;
+      width: 100vw;
+    }
+    #canvas {
+      flex: 1 1 0;
+      background: #ddd; /* Kolor tła płótna */
+    }
+    #sidebar {
+      flex: 0 0 320px;
+      background: white;
+      padding: 20px;
+      overflow-y: auto;
+      box-shadow: -2px 0 8px rgba(0,0,0,0.1);
+      z-index: 1; /* Upewnij się, że sidebar jest nad canvasem */
+    }
+    #selected-chair-name {
+      font-size: 18px;
+      font-weight: 600;
+      margin-bottom: 12px;
+      color: #333;
+    }
+    .selection-section {
+      margin-bottom: 20px;
+    }
+    .selection-section h3 {
+      font-size: 16px;
+      margin-top: 0;
+      margin-bottom: 10px;
+      color: #555;
+    }
+    #thumbnails, #legs-thumbnails {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .thumbnail {
+      width: 80px;
+      height: 80px;
+      object-fit: contain;
+      cursor: pointer;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+      transition: transform 0.2s, border-color 0.2s;
+    }
+    .thumbnail:hover {
+      transform: scale(1.05);
+      border-color: #444;
+    }
+    
+    .thumbnail.selected {
+      outline: 2px solid #007bff;
+      border-radius: 6px;
+    }
+
+    #thumbnails img,
+    #legs-thumbnails img {
+      transition: outline 0.2s ease;
+      cursor: pointer;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #ccc;
+      margin: 16px 0 12px;
+    }
   </style>
 </head>
 <body>
@@ -22,9 +94,23 @@
     <div id="sidebar">
       <div id="selected-chair-name">Wybrane krzesło: Brak</div>
       <hr />
-      <div id="thumbnails"></div>
-      <div id="legs-separator" style="display:none; margin:10px 0; border-top:1px solid #aaa;"></div>
-      <div id="legs-thumbnails" style="display:none; flex-wrap: wrap; gap: 6px;"></div>
+
+      <!-- Sekcja miniatur krzeseł -->
+      <div class="selection-section">
+        <h3>Wybierz krzesło:</h3>
+        <div id="thumbnails"></div>
+      </div>
+
+      <!-- Separator i sekcja miniaturek nóg -->
+      <div id="legs-section" style="display:none;"> <!-- Dodany główny kontener dla sekcji nóg -->
+        <hr id="legs-separator" style="margin:10px 0;"> <!-- Zmienione na hr, będzie sterowany JS -->
+        <div class="selection-section">
+          <h3>Wybierz nogi:</h3>
+          <div id="legs-thumbnails" style="flex-wrap: wrap; gap: 6px;"></div>
+        </div>
+      </div>
+
+      <!-- Podsumowanie na dole sidebaru -->
       <div id="summary" style="margin-top: 20px; padding-top: 10px; border-top: 1px solid #ccc; font-family: Arial, sans-serif; font-size: 14px; color: #333;"></div>
     </div>
 
@@ -34,14 +120,14 @@
       import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
       let viewer;
-      let currentModelContainer = null;
-      let currentLegModel = null;
+      let currentModelContainer = null; 
+      let currentLegModel = null; 
       let shadowObject = null;
       let globalSheetData = [];
       let legsData = [];
       let selectedChairThumbnail = null;
       let selectedLegThumbnail = null;
-      let cacheVersion = 3; // Zwiększam cacheVersion, żeby wymusić odświeżenie po zmianach
+      let cacheVersion = 4; // Zwiększam cacheVersion, żeby wymusić odświeżenie po zmianach
 
       let selectedChair = null;
       let selectedLeg = null;
@@ -86,10 +172,9 @@
         resizeCanvas();
         await loadDataFromSheet();
 
-        const legsContainer = document.getElementById('legs-thumbnails');
-        if (legsContainer) legsContainer.style.display = 'none';
-        const legsSeparator = document.getElementById('legs-separator');
-        if (legsSeparator) legsSeparator.style.display = 'none';
+        // Na start ukryj sekcję nóg (teraz cały kontener sekcji nóg)
+        const legsSection = document.getElementById('legs-section');
+        if (legsSection) legsSection.style.display = 'none';
       }
 
       function resetCameraView() {
@@ -293,7 +378,7 @@
           legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
 
           const thumbnailsDiv = document.getElementById('thumbnails');
-          thumbnailsDiv.innerHTML = '';
+          thumbnailsDiv.innerHTML = ''; // Wyczyść dla pewności
 
           for (const item of chairs) {
             const wrapper = document.createElement('div');
@@ -314,22 +399,21 @@
               highlightSelectedThumbnail(img, thumbnailsDiv);
               selectedChairThumbnail = img;
 
-              const legsContainer = document.getElementById('legs-thumbnails');
-              const legsSeparator = document.getElementById('legs-separator');
+              // Zaktualizuj widoczność sekcji nóg
+              const legsSection = document.getElementById('legs-section'); // Użyj nowego ID
               if (item.Grupa === 'kubełek') {
-                legsContainer.style.display = 'block';
-                legsSeparator.style.display = 'block';
+                legsSection.style.display = 'block'; // Pokaż całą sekcję nóg
                 renderLegsThumbnails();
               } else {
-                legsContainer.style.display = 'none';
-                legsSeparator.style.display = 'none';
+                legsSection.style.display = 'none'; // Ukryj całą sekcję nóg
+                // Jeśli zmieniono na całe krzesło, usuń wybrane nogi
                 if (currentLegModel) {
                     viewer.scene.remove(currentLegModel);
                     currentLegModel.dispose?.();
                     currentLegModel = null;
                 }
-                selectedLeg = null;
-                if(selectedLegThumbnail) selectedLegThumbnail.classList.remove('selected');
+                selectedLeg = null; // Zresetuj wybrane nogi
+                if(selectedLegThumbnail) selectedLegThumbnail.classList.remove('selected'); // Odznacz miniaturkę nóg
                 selectedLegThumbnail = null;
               }
 
@@ -351,21 +435,19 @@
             thumbnailsDiv.appendChild(wrapper);
           }
 
+          // Załaduj pierwsze krzesło/kubełek na starcie
           if (chairs.length > 0) {
             await loadModel(chairs[0].Nazwa, chairs[0].Grupa);
             highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
             selectedChairThumbnail = thumbnailsDiv.querySelector('.thumbnail');
 
             selectedChair = chairs[0];
-            const legsContainer = document.getElementById('legs-thumbnails');
-            const legsSeparator = document.getElementById('legs-separator');
+            const legsSection = document.getElementById('legs-section'); // Użyj nowego ID
             if (selectedChair.Grupa === 'kubełek') {
-              legsContainer.style.display = 'block';
-              legsSeparator.style.display = 'block';
+              legsSection.style.display = 'block';
               renderLegsThumbnails();
             } else {
-              legsContainer.style.display = 'none';
-              legsSeparator.style.display = 'none';
+              legsSection.style.display = 'none';
             }
 
             updateSummary();
