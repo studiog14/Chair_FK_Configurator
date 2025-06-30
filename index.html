@@ -98,178 +98,356 @@
   </div>
 
  <script type="module">
-  import * as THREE from 'https://cdn.skypack.dev/three';
-  import { GLTFLoader } from 'https://cdn.skypack.dev/three/examples/jsm/loaders/GLTFLoader.js';
-  import { OrbitControls } from 'https://cdn.skypack.dev/three/examples/jsm/controls/OrbitControls.js';
+  import { ThreeViewer, LoadingScreenPlugin, GBufferPlugin, SSAAPlugin } from 'threepipe';
+  import { SSReflectionPlugin, BloomPlugin } from '@threepipe/webgi-plugins';
 
-  const scene = new THREE.Scene();
-  const camera = new THREE.PerspectiveCamera(35, window.innerWidth / window.innerHeight, 0.1, 100);
-  const renderer = new THREE.WebGLRenderer({ antialias: true });
-  renderer.setSize(window.innerWidth, window.innerHeight);
-  document.getElementById('viewer').appendChild(renderer.domElement);
-
-  const controls = new OrbitControls(camera, renderer.domElement);
-  camera.position.set(0, 1.5, 3);
-  controls.update();
-
-  const ambientLight = new THREE.AmbientLight(0xffffff, 1);
-  scene.add(ambientLight);
-
-  const loader = new GLTFLoader();
-  const currentModelContainer = new THREE.Group();
-  scene.add(currentModelContainer);
-
-  let currentBucketModel = null;
+  let viewer;
+  let currentModelContainer = null;
   let currentLegModel = null;
+  let shadowObject = null;
+  let globalSheetData = [];
+  let legsData = [];
+  let selectedChairThumbnail = null;
+  let selectedLegThumbnail = null;
+  let cacheVersion = 1; // podbij to na 2, 3, 4 jak aktualizujesz modele
+  let bucketContainer = null; // <--- DODAJ TO
+
+  // Przechowujemy aktualnie wybrane obiekty z danymi (do podsumowania)
   let selectedChair = null;
   let selectedLeg = null;
 
-  function setBucketModel(bucketModelPath) {
-    loader.load(bucketModelPath, function (gltf) {
-      if (currentBucketModel) {
-        currentModelContainer.remove(currentBucketModel);
-      }
+  async function init() {
+    const canvas = document.getElementById('canvas');
+    viewer = new ThreeViewer({
+      canvas,
+      plugins: [
+        LoadingScreenPlugin,
+        GBufferPlugin,
+        SSAAPlugin,
+        SSReflectionPlugin,
+        BloomPlugin
+      ],
+      rendererSettings: { antialias: true }
+    });
 
-      currentBucketModel = gltf.scene;
-      currentBucketModel.position.set(0, 0, 0);
-      currentModelContainer.add(currentBucketModel);
+    resetCameraView();
 
-      if (currentLegModel) {
-        setLegModel(currentLegModel.userData.modelPath);
-      }
+    try {
+      await viewer.setEnvironmentMap('hdr/old_apartments_walkway_1k.hdr', { isHDR: true });
+      const ssaa = viewer.getPlugin(SSAAPlugin);
+      if (ssaa) ssaa.setSampleLevel(6);
+    } catch (e) {
+      console.error("Błąd środowiska HDR:", e);
+    }
 
-      updateCameraToFitModel();
+    try {
+      const shadowModel = await viewer.load('chairs/Shadow.glb', {
+        autoCenter: false,
+        autoScale: false
+      });
+      shadowObject = shadowModel;
+      viewer.scene.add(shadowObject);
+      shadowObject.name = "Shadow";
+    } catch (e) {
+      console.error("Błąd ładowania Shadow:", e);
+    }
+
+    window.addEventListener('resize', resizeCanvas);
+    resizeCanvas();
+    await loadDataFromSheet();
+
+    // Na start ukryj sekcję nóg
+    const legsContainer = document.getElementById('legs-thumbnails');
+    if (legsContainer) legsContainer.style.display = 'none';
+  }
+
+  function resetCameraView() {
+    const cam = viewer.scene.activeCamera;
+    cam.position.set(-3.2, 1.4, 2);
+    cam.lookAt(0, 2, 0);
+    cam.near = 0.1;
+    cam.far = 1000;
+    cam.updateProjectionMatrix();
+  }
+
+  function resizeCanvas() {
+    const sidebarWidth = document.getElementById('sidebar').offsetWidth;
+    const w = window.innerWidth - sidebarWidth;
+    viewer.renderer.setSize(w, window.innerHeight);
+    const canvas = document.getElementById('canvas');
+    canvas.style.width = w + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    const cam = viewer.scene.activeCamera;
+    cam.aspect = w / window.innerHeight;
+    cam.updateProjectionMatrix();
+  }
+
+  async function setLegModel(variant) {
+  if (!currentModelContainer) return; // Upewnij się, że kubełek jest już załadowany
+
+  if (currentLegModel) {
+    viewer.scene.remove(currentLegModel);
+    currentLegModel.dispose?.();
+    currentLegModel = null;
+  }
+
+  try {
+    // 1. Załaduj model nóg bez autoCenter i autoScale.
+    // Dzięki temu zachowasz ich oryginalne współrzędne z Blendera,
+    // co pozwoli na precyzyjne pozycjonowanie względem kubełka.
+    currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
+      autoCenter: false, // KLUCZOWA ZMIANA: Nie centruj automatycznie nóg
+      autoScale: false   // KLUCZOWA ZMIANA: Nie skaluj automatycznie
+    });
+
+    // 2. Skalowanie nóg
+    // Prawdopodobnie chcesz skalować nogi tak, aby ich wysokość odpowiadała 'variant.height'.
+    // Najpierw pobierz oryginalną wysokość modelu nóg (przed skalowaniem).
+    const initialLegBoundingBox = currentLegModel.getBounds().box;
+    const originalLegModelHeight = initialLegBoundingBox.max.y - initialLegBoundingBox.min.y;
+
+    // Użyj 'variant.height' jako docelowej wysokości, w przeciwnym razie użyj oryginalnej.
+    const desiredLegHeight = variant.height ? parseFloat(variant.height) : originalLegModelHeight;
+
+    if (originalLegModelHeight > 0.0001) { // Zapobiegaj dzieleniu przez zero
+      const scaleFactor = desiredLegHeight / originalLegModelHeight;
+      currentLegModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    } else {
+      console.warn(`Original leg model height for ${variant.Nazwa} is zero, cannot scale.`);
+    }
+
+    // 3. Dodaj nogi do kontenera kubełka
+    currentModelContainer.add(currentLegModel);
+
+    // 4. Pozycjonowanie nóg względem kubełka.
+    // Zakładając, że:
+    // a) Model kubełka po autoCenter ma swoją podstawę na Y=0 (lokalnie, w currentModelContainer).
+    // b) Model nóg po załadowaniu (bez autoCenter) ma swój punkt zaczepienia do kubełka na Y=0 (lokalnie w currentLegModel),
+    //    a same nogi rozciągają się w dół (czyli ich min.y jest wartością ujemną).
+    // Wtedy nogi powinny być po prostu na (0,0,0) względem kubełka,
+    // a cały zestaw (kubełek + nogi) musi być podniesiony o wysokość nóg.
+    currentLegModel.position.set(0, 0, 0); // Ustawia nogi w punkcie 0,0,0 kontenera kubełka
+
+    // 5. Podnieś cały zestaw (kubełek + nogi) tak, aby stopy nóg były na Y=0 świata.
+    // currentModelContainer to teraz obiekt, który zawiera zarówno kubełek, jak i nogi.
+    // Jeśli desiredLegHeight to wysokość nóg od punktu zaczepienia do ziemi,
+    // to podnosimy cały zestaw o tę wartość.
+    currentModelContainer.position.y = desiredLegHeight;
+
+
+    // KLUCZOWA ZMIANA: USUŃ TEN BLOK KODU. To jest ta linia, która powodowała podwójne podnoszenie!
+    // if (variant.height) {
+    //   const offset = parseFloat(variant.height);
+    //   if (currentModelContainer.children.length > 0) {
+    //     const chair = currentModelContainer.children[0];
+    //     chair.position.y = offset; // <--- TEGO SIĘ POZBĄDŹ
+    //     resetCameraView(); // Nie potrzeba tutaj resetować kamery
+    //   }
+    // }
+
+    // Pozycjonowanie kamery (lepiej użyć fitTo)
+    if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
+      viewer.controls.fitTo(currentModelContainer, true);
+    } else {
+      resetCameraView(); // Fallback
+    }
+
+    selectedLeg = variant;
+    updateSummary();
+
+  } catch (e) {
+    console.error("Błąd ładowania modelu nóg:", e);
+  }
+}
+  
+
+
+  async function loadModel(name) {
+    if (currentModelContainer) {
+      viewer.scene.remove(currentModelContainer);
+      currentModelContainer.dispose?.();
+      currentModelContainer = null;
+    }
+    if (currentLegModel) {
+      viewer.scene.remove(currentLegModel);
+      currentLegModel.dispose?.();
+      currentLegModel = null;
+    }
+
+    try {
+      const model = await viewer.load(`chairs/${name}.glb?v=${cacheVersion}`, {
+        autoCenter: true,
+        autoScale: true
+      });
+      currentModelContainer = model;
+      viewer.scene.add(model);
+
+// Zamień resetCameraView() na:
+if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
+  viewer.controls.fitTo(model, true);
+} else {
+  resetCameraView(); // na wszelki wypadek zostaw fallback
+}
+
+
+      // reszta kodu...
+    } catch (e) {
+      console.error("Błąd ładowania modelu:", e);
+    }
+  }
+
+  function renderLegsThumbnails() {
+    const legsThumbnailsDiv = document.getElementById('legs-thumbnails');
+    legsThumbnailsDiv.innerHTML = '';
+
+    legsData.forEach(item => {
+      const wrapper = document.createElement('div');
+      wrapper.style.display = 'inline-block';
+      wrapper.style.marginRight = '6px';
+      wrapper.style.textAlign = 'center';
+
+      const img = document.createElement('img');
+      img.src = item.Obrazek;
+      img.alt = item.Nazwa || 'nogi';
+      img.title = item.Nazwa || '';
+      img.className = 'thumbnail';
+      img.style.width = '60px';
+      img.style.height = '60px';
+
+      img.addEventListener('click', () => {
+        setLegModel(item);
+        highlightSelectedThumbnail(img, legsThumbnailsDiv);
+      });
+
+      const caption = document.createElement('div');
+      caption.style.fontSize = '12px';
+      caption.style.marginTop = '2px';
+      caption.style.color = '#222';
+      caption.innerHTML = `
+        <strong>${item.Nazwa}</strong><br/>
+        <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
+      `;
+
+      wrapper.appendChild(img);
+      wrapper.appendChild(caption);
+      legsThumbnailsDiv.appendChild(wrapper);
     });
   }
 
-  function setLegModel(legModelPath) {
-    loader.load(legModelPath, function (gltf) {
-      if (currentLegModel) {
-        currentModelContainer.remove(currentLegModel);
-      }
-
-      currentLegModel = gltf.scene;
-      currentLegModel.userData.modelPath = legModelPath;
-      currentLegModel.position.set(0, -0.45, 0);
-      currentModelContainer.add(currentLegModel);
-
-      updateCameraToFitModel();
-    });
+  function highlightSelectedThumbnail(selectedImg, container) {
+    const thumbnails = container.querySelectorAll('.thumbnail');
+    thumbnails.forEach(img => img.classList.remove('selected'));
+    selectedImg.classList.add('selected');
+    selectedChairThumbnail = selectedImg;
   }
 
-  function updateCameraToFitModel() {
-    const box = new THREE.Box3().setFromObject(currentModelContainer);
-    const size = box.getSize(new THREE.Vector3()).length();
-    const center = box.getCenter(new THREE.Vector3());
+  async function loadDataFromSheet() {
+    const sheetURL = 'https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Dane';
+    try {
+      const res = await fetch(sheetURL);
+      const data = await res.json();
+      globalSheetData = data;
 
-    controls.reset();
-    camera.near = size / 100;
-    camera.far = size * 100;
-    camera.updateProjectionMatrix();
+      const chairs = data.filter(item => ["krzesło", "kubełek"].includes(item.Grupa) && item.Obrazek);
+      legsData = data.filter(item => item.Grupa === "nogi" && item.Obrazek);
 
-    camera.position.copy(center);
-    camera.position.x += size / 2.0;
-    camera.position.y += size / 5.0;
-    camera.position.z += size / 2.0;
-    camera.lookAt(center);
-    controls.update();
-  }
+      const thumbnailsDiv = document.getElementById('thumbnails');
+      thumbnailsDiv.innerHTML = '';
 
-  function animate() {
-    requestAnimationFrame(animate);
-    renderer.render(scene, camera);
-  }
+      for (const item of chairs) {
+        const wrapper = document.createElement('div');
+        wrapper.style.display = 'inline-block';
+        wrapper.style.marginRight = '6px';
+        wrapper.style.textAlign = 'center';
 
-  animate();
+        const img = document.createElement('img');
+        img.src = item.Obrazek;
+        img.alt = item.Nazwa || 'model';
+        img.title = item.Nazwa || '';
+        img.className = 'thumbnail';
+        img.style.width = '60px';
+        img.style.height = '60px';
 
-  // ŁADOWANIE DANYCH Z GOOGLE SHEETS
-  fetch('https://opensheet.elk.sh/1vCs6YeHgKqlYwg8rvJOqVzNRnXeATJCBuK-zh3NNj78/Arkusz1')
-    .then(response => response.json())
-    .then(data => {
-      const chairButtons = document.getElementById('chair-buttons');
-      const materialButtons = document.getElementById('material-buttons');
-      const legButtons = document.getElementById('leg-buttons');
+        img.addEventListener('click', async () => {
+          await loadModel(item.Nazwa);
+          highlightSelectedThumbnail(img, thumbnailsDiv);
 
-      const chairs = data.filter(item => item.Grupa === 'krzesło' || item.Grupa === 'kubełek');
-      const legs = data.filter(item => item.Grupa === 'nogi');
+          // --- MOD: pokaz/ukryj nogi po grupie
+          const legsContainer = document.getElementById('legs-thumbnails');
+          if (item.Grupa === 'kubełek') {
+            legsContainer.style.display = 'block';
+            renderLegsThumbnails();
+          } else {
+            legsContainer.style.display = 'none';
+          }
 
-      function renderChairThumbnails(group) {
-        chairButtons.innerHTML = '';
-        chairs
-          .filter(item => item.Grupa === group)
-          .forEach(item => {
-            const div = document.createElement('div');
-            div.classList.add('thumbnail');
-            div.innerHTML = `<img src="${item.Obrazek}" alt="${item.Nazwa}"><p>${item.Nazwa}</p>`;
-            div.addEventListener('click', () => {
-              selectedChair = item;
-              selectedLeg = null;
-              setBucketModel(`chairs/${item.Nazwa}.glb`);
-              if (item.Grupa === 'kubełek') {
-                document.getElementById('legs-section').style.display = 'block';
-                renderLegsThumbnails();
-              } else {
-                document.getElementById('legs-section').style.display = 'none';
-              }
-              updateSummary();
-            });
-            chairButtons.appendChild(div);
-          });
-      }
-
-      function renderLegsThumbnails() {
-        legButtons.innerHTML = '';
-        legs.forEach(item => {
-          const div = document.createElement('div');
-          div.classList.add('thumbnail');
-          div.innerHTML = `<img src="${item.Obrazek}" alt="${item.Nazwa}"><p>${item.Nazwa}</p>`;
-          div.addEventListener('click', () => {
-            selectedLeg = item;
-            setLegModel(`chairs/${item.Nazwa}.glb`);
-            updateSummary();
-          });
-          legButtons.appendChild(div);
+          // --- MOD: zapisz wybrane krzesło i aktualizuj podsumowanie
+          selectedChair = item;
+          updateSummary();
         });
+
+        const caption = document.createElement('div');
+        caption.style.fontSize = '12px';
+        caption.style.marginTop = '2px';
+        caption.style.color = '#222';
+        caption.innerHTML = `
+          <strong>${item.Nazwa}</strong><br/>
+          <span style="color: #666; font-size: 11px;">${item.Cena ? `Cena: ${item.Cena} PLN` : ''}</span>
+        `;
+
+        wrapper.appendChild(img);
+        wrapper.appendChild(caption);
+        thumbnailsDiv.appendChild(wrapper);
       }
 
-      function updateSummary() {
-        const summaryDiv = document.getElementById('summary');
-        if (!summaryDiv) return;
+      if (chairs.length > 0) {
+        await loadModel(chairs[0].Nazwa);
+        highlightSelectedThumbnail(thumbnailsDiv.querySelector('.thumbnail'), thumbnailsDiv);
 
-        let html = '<h3>Podsumowanie</h3>';
-        if (selectedChair) {
-          html += `<p><strong>Krzesło:</strong> ${selectedChair.Nazwa || ''}</p>`;
-          if (selectedChair.Cena) html += `<p><strong>Cena:</strong> ${selectedChair.Cena} PLN</p>`;
+        // --- MOD: ustaw selectedChair i pokaż/ukryj nogi na starcie
+        selectedChair = chairs[0];
+        const legsContainer = document.getElementById('legs-thumbnails');
+        if (selectedChair.Grupa === 'kubełek') {
+          legsContainer.style.display = 'block';
+          renderLegsThumbnails();
+        } else {
+          legsContainer.style.display = 'none';
         }
 
-        if (selectedChair && selectedChair.Grupa === 'kubełek' && selectedLeg) {
-          html += `<p><strong>Nogi:</strong> ${selectedLeg.Nazwa || ''}</p>`;
-          if (selectedLeg.Cena) html += `<p><strong>Cena nóg:</strong> ${selectedLeg.Cena} PLN</p>`;
-        }
-
-        const chairPrice = selectedChair?.Cena ? parseFloat(selectedChair.Cena) : 0;
-        const legPrice = selectedLeg?.Cena ? parseFloat(selectedLeg.Cena) : 0;
-        const totalPrice = chairPrice + legPrice;
-        html += `<p><strong>Razem:</strong> ${totalPrice.toFixed(2)} PLN</p>`;
-
-        summaryDiv.innerHTML = html;
+        updateSummary();
       }
 
-      // Domyślne ładowanie grupy "krzesło"
-      renderChairThumbnails('krzesło');
+    } catch (e) {
+      console.error("Błąd pobierania danych z Google Sheet:", e);
+    }
+  }
 
-      document.getElementById('show-chairs').addEventListener('click', () => {
-        renderChairThumbnails('krzesło');
-        document.getElementById('legs-section').style.display = 'none';
-      });
+  function updateSummary() {
+    const summaryDiv = document.getElementById('summary');
+    if (!summaryDiv) return;
 
-      document.getElementById('show-buckets').addEventListener('click', () => {
-        renderChairThumbnails('kubełek');
-        document.getElementById('legs-section').style.display = 'block';
-      });
-    });
+    summaryDiv.innerHTML = '';
+
+    if (selectedChair) {
+      summaryDiv.innerHTML += `<h3>Wybrane krzesło:</h3><p>${selectedChair.Nazwa}</p>`;
+    }
+    if (selectedLeg) {
+      summaryDiv.innerHTML += `<h3>Wybrane nogi:</h3><p>${selectedLeg.Nazwa}</p>`;
+    }
+  }
+  
+
+  window.onload = () => {
+
+    function resetCameraView() {
+  if (viewer && viewer.controls && typeof viewer.controls.reset === 'function') {
+    viewer.controls.reset();
+  }
+}
+
+    init();
+  }
 </script>
-
 
 
 </body>
