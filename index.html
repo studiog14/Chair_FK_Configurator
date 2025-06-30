@@ -192,64 +192,45 @@
   }
 
   try {
-    // 1. Załaduj model nóg bez autoCenter i autoScale.
-    // Dzięki temu zachowasz ich oryginalne współrzędne z Blendera,
-    // co pozwoli na precyzyjne pozycjonowanie względem kubełka.
     currentLegModel = await viewer.load(`legs/${variant.Nazwa}.glb?v=${cacheVersion}`, {
-      autoCenter: false, // KLUCZOWA ZMIANA: Nie centruj automatycznie nóg
-      autoScale: false   // KLUCZOWA ZMIANA: Nie skaluj automatycznie
+      autoCenter: false, // Pozostawiamy false, aby móc precyzyjnie pozycjonować nogi
+      autoScale: false   // KLUCZOWA ZMIANA: Pozostawiamy false. Będą dziedziczyć skalę od kubełka.
     });
 
-    // 2. Skalowanie nóg
-    // Prawdopodobnie chcesz skalować nogi tak, aby ich wysokość odpowiadała 'variant.height'.
-    // Najpierw pobierz oryginalną wysokość modelu nóg (przed skalowaniem).
-    const initialLegBoundingBox = currentLegModel.getBounds().box;
-    const originalLegModelHeight = initialLegBoundingBox.max.y - initialLegBoundingBox.min.y;
+    // --- KLUCZOWA ZMIANA: USUŃ CAŁY TEN BLOK KODU Z RĘCZNYM SKALOWANIEM NÓG ---
+    // const initialLegBoundingBox = currentLegModel.getBounds().box;
+    // const originalLegModelHeight = initialLegBoundingBox.max.y - initialLegBoundingBox.min.y;
+    // const desiredLegHeight = variant.height ? parseFloat(variant.height) : originalLegModelHeight;
+    // if (originalLegModelHeight > 0.0001) {
+    //   const scaleFactor = desiredLegHeight / originalLegModelHeight;
+    //   currentLegModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
+    // } else {
+    //   console.warn(`Original leg model height for ${variant.Nazwa} is zero, cannot scale.`);
+    // }
+    // -------------------------------------------------------------------------
 
-    // Użyj 'variant.height' jako docelowej wysokości, w przeciwnym razie użyj oryginalnej.
-    const desiredLegHeight = variant.height ? parseFloat(variant.height) : originalLegModelHeight;
-
-    if (originalLegModelHeight > 0.0001) { // Zapobiegaj dzieleniu przez zero
-      const scaleFactor = desiredLegHeight / originalLegModelHeight;
-      currentLegModel.scale.set(scaleFactor, scaleFactor, scaleFactor);
-    } else {
-      console.warn(`Original leg model height for ${variant.Nazwa} is zero, cannot scale.`);
-    }
-
-    // 3. Dodaj nogi do kontenera kubełka
+    // Dodaj nogi jako dziecko kontenera kubełka.
+    // Dzięki temu nogi automatycznie odziedziczą skalę kubełka.
     currentModelContainer.add(currentLegModel);
 
-    // 4. Pozycjonowanie nóg względem kubełka.
+    // Pozycjonowanie nóg względem kubełka.
     // Zakładając, że:
-    // a) Model kubełka po autoCenter ma swoją podstawę na Y=0 (lokalnie, w currentModelContainer).
-    // b) Model nóg po załadowaniu (bez autoCenter) ma swój punkt zaczepienia do kubełka na Y=0 (lokalnie w currentLegModel),
-    //    a same nogi rozciągają się w dół (czyli ich min.y jest wartością ujemną).
-    // Wtedy nogi powinny być po prostu na (0,0,0) względem kubełka,
-    // a cały zestaw (kubełek + nogi) musi być podniesiony o wysokość nóg.
-    currentLegModel.position.set(0, 0, 0); // Ustawia nogi w punkcie 0,0,0 kontenera kubełka
+    // 1. Kubełek ma swój origin w miejscu styku z nogami (na dole).
+    // 2. Nogi mają swój origin w miejscu styku z kubełkiem (na górze).
+    // Wtedy lokalne (0,0,0) jest idealnym miejscem na połączenie.
+    currentLegModel.position.set(0, 0, 0);
 
-    // 5. Podnieś cały zestaw (kubełek + nogi) tak, aby stopy nóg były na Y=0 świata.
-    // currentModelContainer to teraz obiekt, który zawiera zarówno kubełek, jak i nogi.
-    // Jeśli desiredLegHeight to wysokość nóg od punktu zaczepienia do ziemi,
-    // to podnosimy cały zestaw o tę wartość.
-    currentModelContainer.position.y = desiredLegHeight;
+    // Podnieś cały zestaw (kubełek + nogi) tak, aby stopy nóg były na Y=0 świata.
+    // `variant.height` powinien teraz reprezentować faktyczną wysokość nóg (od ziemi do miejsca styku z kubełkiem)
+    // w jednostkach świata, które odpowiadają auto-skalowanej scenie.
+    const legHeight = variant.height ? parseFloat(variant.height) : 0; // Upewnij się, że masz domyślną wysokość, jeśli brak
+    currentModelContainer.position.y = legHeight;
 
-
-    // KLUCZOWA ZMIANA: USUŃ TEN BLOK KODU. To jest ta linia, która powodowała podwójne podnoszenie!
-    // if (variant.height) {
-    //   const offset = parseFloat(variant.height);
-    //   if (currentModelContainer.children.length > 0) {
-    //     const chair = currentModelContainer.children[0];
-    //     chair.position.y = offset; // <--- TEGO SIĘ POZBĄDŹ
-    //     resetCameraView(); // Nie potrzeba tutaj resetować kamery
-    //   }
-    // }
-
-    // Pozycjonowanie kamery (lepiej użyć fitTo)
+    // Dopasowanie kamery do nowego, połączonego modelu
     if (viewer.controls && typeof viewer.controls.fitTo === 'function') {
       viewer.controls.fitTo(currentModelContainer, true);
     } else {
-      resetCameraView(); // Fallback
+      resetCameraView();
     }
 
     selectedLeg = variant;
@@ -259,6 +240,8 @@
     console.error("Błąd ładowania modelu nóg:", e);
   }
 }
+  
+
   
 
 
